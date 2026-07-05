@@ -1,0 +1,6 @@
+# local backups and scratch
+*.backup.json
+*.local.json
+._check.js
+.DS_Store
+Thumbs.db

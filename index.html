@@ -1,0 +1,963 @@
+<!doctype html>
+<html lang="en-NZ">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="app-version" content="v1.1.0">
+  <title>PFE Vehicle Service</title>
+  <style>
+    :root{
+      --bg:#f5f7f4;
+      --surface:#ffffff;
+      --surface-2:#eef2ed;
+      --ink:#17201a;
+      --muted:#637066;
+      --line:#d8dfd7;
+      --brand:#245c45;
+      --brand-2:#dfece4;
+      --accent:#2f6f7e;
+      --warn:#a56b15;
+      --warn-bg:#fff2d8;
+      --bad:#a7332d;
+      --bad-bg:#fbe1de;
+      --good:#277044;
+      --good-bg:#deefe4;
+      --shadow:0 12px 28px rgba(23,32,26,.08);
+      --radius:8px;
+      --tap:44px;
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;min-height:100%;background:var(--bg);color:var(--ink);font-family:Arial,Helvetica,sans-serif;letter-spacing:0;overflow-x:hidden}
+    body{font-size:15px;line-height:1.35}
+    button,input,select,textarea{font:inherit}
+    button{min-height:var(--tap);border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:var(--radius);padding:10px 12px;cursor:pointer;font-weight:700}
+    button:hover{border-color:var(--brand)}
+    button.primary{background:var(--brand);border-color:var(--brand);color:#fff}
+    button.ghost{background:transparent}
+    button.danger{background:var(--bad);border-color:var(--bad);color:#fff}
+    button.slim{min-height:36px;padding:7px 10px;font-size:13px}
+    input,select,textarea{width:100%;min-height:var(--tap);border:1px solid var(--line);border-radius:var(--radius);background:#fff;color:var(--ink);padding:10px}
+    textarea{min-height:92px;resize:vertical}
+    label{display:grid;gap:6px;font-size:12px;font-weight:700;color:var(--muted)}
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+    th{font-size:12px;color:var(--muted);text-transform:uppercase}
+    .app{min-height:100dvh;display:grid;grid-template-rows:auto auto 1fr}
+    header{background:var(--surface);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:8}
+    .head{max-width:1280px;margin:0 auto;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+    .brand{display:flex;align-items:center;gap:10px;min-width:0}
+    .mark{width:34px;height:34px;border-radius:8px;background:var(--brand);color:#fff;display:grid;place-items:center;font-weight:900}
+    h1{font-size:18px;margin:0;line-height:1.1}
+    .sub{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .head-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+    .statusbar{background:var(--surface-2);border-bottom:1px solid var(--line)}
+    .status-inner{max-width:1280px;margin:0 auto;padding:8px 14px;display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+    .pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:5px 9px;background:var(--surface);border:1px solid var(--line);font-size:12px;font-weight:800;color:var(--muted)}
+    .pill.good{background:var(--good-bg);color:var(--good);border-color:#b9dec4}
+    .pill.warn{background:var(--warn-bg);color:var(--warn);border-color:#efd092}
+    .pill.bad{background:var(--bad-bg);color:var(--bad);border-color:#efb4ae}
+    nav{background:var(--surface);border-bottom:1px solid var(--line);overflow-x:auto;max-width:100vw}
+    .tabs{max-width:1280px;margin:0 auto;display:flex;gap:4px;padding:8px 14px}
+    .tab{white-space:nowrap;border:0;background:transparent;color:var(--muted);font-weight:800;padding:10px 12px}
+    .tab.active{background:var(--brand-2);color:var(--brand)}
+    main{max-width:1280px;width:100%;margin:0 auto;padding:14px}
+    .toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 12px;flex-wrap:wrap}
+    .toolbar h2{margin:0;font-size:20px}
+    .actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+    .grid{display:grid;gap:12px}
+    .grid.cols-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .grid.cols-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+    .grid.cols-4{grid-template-columns:repeat(4,minmax(0,1fr))}
+    .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:12px}
+    .card h3{margin:0 0 8px;font-size:16px}
+    .metric{display:grid;gap:4px}
+    .metric .num{font-size:28px;font-weight:900;line-height:1}
+    .metric .label{font-size:12px;color:var(--muted);font-weight:800}
+    .vehicle-card{display:grid;gap:10px}
+    .vehicle-top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+    .vehicle-name{font-size:17px;font-weight:900}
+    .meta{display:flex;gap:6px;flex-wrap:wrap;color:var(--muted);font-size:12px}
+    .kv{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+    .kv div{background:var(--surface-2);border-radius:var(--radius);padding:8px}
+    .kv strong{display:block;font-size:15px}
+    .kv span{display:block;font-size:11px;color:var(--muted);font-weight:800}
+    .table-wrap{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);overflow:auto;box-shadow:var(--shadow)}
+    .empty{padding:28px;text-align:center;color:var(--muted);font-weight:700}
+    .split{display:grid;grid-template-columns:260px 1fr;gap:12px}
+    .side{display:grid;gap:8px;align-content:start}
+    .side button{justify-content:flex-start;text-align:left}
+    .side button.active{background:var(--brand);border-color:var(--brand);color:#fff}
+    .filter-row{display:grid;grid-template-columns:1fr 180px 180px;gap:8px;margin:0 0 12px}
+    .fine{font-size:12px;color:var(--muted)}
+    .right{text-align:right}
+    .nowrap{white-space:nowrap}
+    .muted{color:var(--muted)}
+    .modal-backdrop{position:fixed;inset:0;background:rgba(12,18,15,.48);display:none;z-index:30;align-items:flex-end;justify-content:center;padding:12px}
+    .modal-backdrop.open{display:flex}
+    .modal{width:min(720px,100%);max-height:92dvh;overflow:auto;background:var(--surface);border-radius:12px;border:1px solid var(--line);box-shadow:0 24px 70px rgba(0,0,0,.25)}
+    .modal-head{position:sticky;top:0;background:var(--surface);border-bottom:1px solid var(--line);padding:14px;display:flex;justify-content:space-between;align-items:center;gap:10px}
+    .modal-head h2{font-size:18px;margin:0}
+    .modal-body{padding:14px;display:grid;gap:12px}
+    .modal-actions{position:sticky;bottom:0;background:var(--surface);border-top:1px solid var(--line);padding:12px 14px;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+    .form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    .form-grid .full{grid-column:1/-1}
+    .toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:var(--ink);color:#fff;border-radius:999px;padding:10px 14px;font-weight:800;display:none;z-index:40}
+    .toast.show{display:block}
+    @media (max-width:860px){
+      .grid.cols-2,.grid.cols-3,.grid.cols-4{grid-template-columns:1fr}
+      .split{grid-template-columns:1fr}
+      .side{grid-template-columns:repeat(2,minmax(0,1fr))}
+      .filter-row{grid-template-columns:1fr}
+      .head{align-items:flex-start}
+      .head-actions{width:100%;justify-content:flex-start}
+    }
+    @media (max-width:560px){
+      body{font-size:14px}
+      .head{display:grid}
+      .tabs{padding:7px;width:max-content;min-width:100%;max-width:none}
+      main{padding:10px;max-width:100vw;overflow-x:hidden}
+      .head,.status-inner{max-width:100vw;overflow-x:hidden}
+      .status-inner .actions{max-width:100%;overflow-x:auto;flex-wrap:nowrap;padding-bottom:2px}
+      .form-grid{grid-template-columns:1fr}
+      .kv{grid-template-columns:1fr 1fr}
+      th,td{padding:9px 8px}
+      .side{grid-template-columns:1fr}
+    }
+    @media print{
+      header,nav,.statusbar,.toolbar .actions,.modal-backdrop,.toast{display:none!important}
+      body{background:#fff}
+      main{max-width:none;padding:0}
+      .card,.table-wrap{box-shadow:none}
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div class="head">
+        <div class="brand">
+          <div class="mark">PFE</div>
+          <div>
+            <h1>Vehicle Service</h1>
+            <div class="sub">Fleet, servicing, parts, and review</div>
+          </div>
+        </div>
+        <div class="head-actions">
+          <span class="pill" id="version-pill">v1.1.0</span>
+          <button class="primary" onclick="openCompleteService()">Complete service</button>
+          <button onclick="openVehicleModal()">Add vehicle</button>
+        </div>
+      </div>
+    </header>
+    <div class="statusbar">
+      <div class="status-inner">
+        <div class="actions" id="status-pills"></div>
+        <div class="fine" id="save-status">Saved locally</div>
+      </div>
+    </div>
+    <nav><div class="tabs" id="tabs"></div></nav>
+    <main id="view"></main>
+  </div>
+
+  <div class="modal-backdrop" id="modal-backdrop" onclick="backdropClose(event)">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <div class="modal-head">
+        <h2 id="modal-title"></h2>
+        <button class="slim ghost" onclick="closeModal()">Close</button>
+      </div>
+      <div class="modal-body" id="modal-body"></div>
+      <div class="modal-actions" id="modal-actions"></div>
+    </div>
+  </div>
+  <div class="toast" id="toast"></div>
+  <input type="file" id="restore-file" accept="application/json" hidden>
+
+  <script>
+    const VERSION = "v1.1.0";
+    const STORAGE_KEY = "pfe_vehicle_service_v1";
+    // Google Sheets sync. Paste the Apps Script Web App URL to turn sync ON.
+    // Empty string = sync OFF, localStorage only (safe default — nothing leaves the device).
+    const SCRIPT_URL = "";
+    const LASTMOD_KEY = STORAGE_KEY + "_lastmod";
+    let syncPending = false;   // a local edit is waiting to be pushed
+    let isPushing = false;     // a push is in flight
+    let pushAgain = false;     // an edit landed mid-push — push again after
+    let pushTimer = null;
+    let pendingDeletes = {vehicles:[],plans:[],history:[],parts:[]};
+    const stampNow = () => new Date().toISOString();
+    const todayISO = () => new Date().toISOString().slice(0,10);
+    const tabs = ["Dashboard","Vehicles","Service Plan","History","Parts","Review"];
+    const seedState = {
+      activeTab:"Dashboard",
+      selectedVehicleId:"veh-ute",
+      settings:{soonKm:500,soonHours:25,soonDays:30,currency:"NZD"},
+      vehicles:[
+        {id:"veh-ute",name:"Sample Ute",rego:"PFE001",type:"Ute",makeModel:"Replace with real vehicle",year:"2021",assignedTo:"Aaron",location:"Workshop",currentKm:84210,currentHours:0,status:"Active",notes:"Sample data. Replace before live use."},
+        {id:"veh-tractor",name:"Sample Tractor",rego:"",type:"Tractor",makeModel:"Replace with real machine",year:"2018",assignedTo:"Aaron",location:"Main yard",currentKm:0,currentHours:3120,status:"Active",notes:"Sample data. Track by hours."},
+        {id:"veh-bike",name:"Sample Side-by-side",rego:"PFE002",type:"Utility vehicle",makeModel:"Replace with real unit",year:"2020",assignedTo:"Aaron",location:"Main yard",currentKm:18240,currentHours:640,status:"Active",notes:"Sample data. Track by km and hours if both are useful."}
+      ],
+      plans:[
+        {id:"plan-ute-oil",vehicleId:"veh-ute",task:"Engine oil and filter",priority:"High",everyKm:10000,everyHours:0,everyMonths:12,lastKm:76000,lastHours:0,lastDate:"2025-11-20",parts:"Oil filter, engine oil",estHours:1.5,supplier:"Local parts supplier",notes:"Check air filter while open."},
+        {id:"plan-ute-wof",vehicleId:"veh-ute",task:"WOF and road licence check",priority:"High",everyKm:0,everyHours:0,everyMonths:6,lastKm:82000,lastHours:0,lastDate:"2026-02-15",parts:"",estHours:0.5,supplier:"Testing station",notes:"Book ahead."},
+        {id:"plan-tractor-service",vehicleId:"veh-tractor",task:"250 hour service",priority:"High",everyKm:0,everyHours:250,everyMonths:12,lastKm:0,lastHours:2920,lastDate:"2026-01-12",parts:"Engine oil, filters, grease",estHours:3,supplier:"Dealer",notes:"Grease loader pins."},
+        {id:"plan-bike-service",vehicleId:"veh-bike",task:"General service",priority:"Normal",everyKm:5000,everyHours:100,everyMonths:6,lastKm:15000,lastHours:560,lastDate:"2026-02-01",parts:"Oil, plug, air filter",estHours:1.5,supplier:"Small engines",notes:"Check tyres and brakes."}
+      ],
+      history:[
+        {id:"hist-1",vehicleId:"veh-ute",date:"2026-02-15",task:"Tyres rotated and WOF check",km:82000,hours:0,parts:"",cost:185,performedBy:"Aaron",notes:"No faults found."},
+        {id:"hist-2",vehicleId:"veh-tractor",date:"2026-01-12",task:"Full service",km:0,hours:2920,parts:"Filters, oil",cost:760,performedBy:"Dealer",notes:"Next service at 3170 hours."}
+      ],
+      parts:[
+        {id:"part-oil-filter",name:"Oil filter",partNo:"TBC",supplier:"Local parts supplier",qty:3,reorder:2,unitCost:42,location:"Workshop shelf",vehicleIds:["veh-ute","veh-bike"],notes:"Confirm part numbers."},
+        {id:"part-grease",name:"Grease cartridges",partNo:"TBC",supplier:"Farm supplier",qty:9,reorder:6,unitCost:11,location:"Workshop",vehicleIds:["veh-tractor"],notes:""}
+      ],
+      updatedAt:new Date().toISOString()
+    };
+    let state = loadState();
+    let modalSave = null;
+
+    function loadState(){
+      try{
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if(!raw) return structuredClone(seedState);
+        const parsed = JSON.parse(raw);
+        return {...structuredClone(seedState),...parsed};
+      }catch(e){
+        return structuredClone(seedState);
+      }
+    }
+    function saveLocal(){
+      state.updatedAt = new Date().toISOString();
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      renderSaveStatus();
+    }
+    function saveState(){
+      saveLocal();
+      schedulePush();
+    }
+    function renderSaveStatus(msg){
+      const el = document.getElementById("save-status");
+      if(!el) return;
+      if(msg){ el.textContent = msg; return; }
+      if(!SCRIPT_URL){ el.textContent = "Saved locally " + niceDateTime(state.updatedAt); return; }
+      if(isPushing) el.textContent = "Syncing…";
+      else if(syncPending) el.textContent = "Saving…";
+      else el.textContent = "Synced " + niceDateTime(state.updatedAt);
+    }
+    function mutate(fn,msg){
+      fn();
+      saveState();
+      render();
+      if(msg) toast(msg);
+    }
+    function syncPayload(){
+      return {
+        vehicles: state.vehicles,
+        plans: state.plans,
+        history: state.history,
+        parts: state.parts.map(p=>({...p,vehicleIds:(p.vehicleIds||[]).join("|")})),
+        settings: state.settings,
+        deletes: pendingDeletes,
+        lastModified: localStorage.getItem(LASTMOD_KEY) || ""
+      };
+    }
+    function applyServer(srv){
+      if(!srv) return;
+      if(Array.isArray(srv.vehicles)) state.vehicles = srv.vehicles;
+      if(Array.isArray(srv.plans)) state.plans = srv.plans;
+      if(Array.isArray(srv.history)) state.history = srv.history;
+      if(Array.isArray(srv.parts)) state.parts = srv.parts.map(p=>({...p,vehicleIds:typeof p.vehicleIds==="string"?p.vehicleIds.split("|").filter(Boolean):(p.vehicleIds||[])}));
+      if(srv.settings) state.settings = {...state.settings, ...srv.settings};
+      saveLocal();
+      render();
+    }
+    function schedulePush(){
+      if(!SCRIPT_URL) return;
+      syncPending = true;
+      renderSaveStatus();
+      clearTimeout(pushTimer);
+      pushTimer = setTimeout(pushToSheet, 1500);
+    }
+    async function pushToSheet(){
+      if(!SCRIPT_URL) return;
+      if(isPushing){ pushAgain = true; return; }
+      isPushing = true; renderSaveStatus();
+      try{
+        const res = await fetch(SCRIPT_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(syncPayload())});
+        const data = await res.json();
+        if(data && data.status === "ok"){
+          localStorage.setItem(LASTMOD_KEY, data.lastModified||"");
+          pendingDeletes = {vehicles:[],plans:[],history:[],parts:[]};
+          syncPending = false;
+          if(data.data) applyServer(data.data);
+        }else{
+          renderSaveStatus("Sync error — saved locally");
+        }
+      }catch(e){
+        renderSaveStatus("Offline — saved locally");
+      }finally{
+        isPushing = false;
+        if(pushAgain){ pushAgain = false; schedulePush(); }
+        else renderSaveStatus();
+      }
+    }
+    async function pullFromSheet(){
+      if(!SCRIPT_URL) return;
+      try{
+        const res = await fetch(SCRIPT_URL);
+        const data = await res.json();
+        if(data && data.lastModified !== undefined){
+          applyServer(data);
+          localStorage.setItem(LASTMOD_KEY, data.lastModified||"");
+        }
+      }catch(e){}
+    }
+    async function pollSheet(){
+      if(!SCRIPT_URL || isPushing || syncPending) return;
+      const ae = document.activeElement;
+      if(ae && ["INPUT","SELECT","TEXTAREA"].includes(ae.tagName)) return;
+      try{
+        const res = await fetch(SCRIPT_URL);
+        const data = await res.json();
+        if(isPushing || syncPending) return;
+        if(data && data.lastModified && data.lastModified !== (localStorage.getItem(LASTMOD_KEY)||"")){
+          applyServer(data);
+          localStorage.setItem(LASTMOD_KEY, data.lastModified||"");
+        }
+      }catch(e){}
+    }
+    function id(prefix){return prefix + "-" + Math.random().toString(36).slice(2,9)}
+    function esc(v){
+      return String(v ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
+    }
+    function money(v){
+      const n = Number(v)||0;
+      return "$" + n.toLocaleString("en-NZ",{maximumFractionDigits:0});
+    }
+    function num(v){return Number(v||0).toLocaleString("en-NZ")}
+    function vehicleName(id){
+      const v = state.vehicles.find(x=>x.id===id);
+      return v ? v.name : "Unknown";
+    }
+    function selectedVehicle(){
+      return state.vehicles.find(v=>v.id===state.selectedVehicleId) || state.vehicles[0];
+    }
+    function byId(id){return document.getElementById(id)}
+    function formVal(id){const el = byId(id); return el ? el.value.trim() : ""}
+    function formNum(id){const v = formVal(id); return v === "" ? 0 : Number(v)}
+    function niceDate(d){
+      if(!d) return "-";
+      const dt = new Date(d + "T00:00:00");
+      if(Number.isNaN(dt.getTime())) return d;
+      return dt.toLocaleDateString("en-NZ",{day:"2-digit",month:"short",year:"numeric"});
+    }
+    function niceDateTime(iso){
+      const dt = new Date(iso);
+      if(Number.isNaN(dt.getTime())) return "";
+      return dt.toLocaleString("en-NZ",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"});
+    }
+    function addMonths(iso,months){
+      if(!iso || !months) return null;
+      const d = new Date(iso + "T00:00:00");
+      if(Number.isNaN(d.getTime())) return null;
+      const day = d.getDate();
+      d.setMonth(d.getMonth() + Number(months));
+      if(d.getDate() < day) d.setDate(0);
+      return d;
+    }
+    function daysUntil(dateObj){
+      if(!dateObj) return null;
+      const now = new Date(todayISO() + "T00:00:00");
+      return Math.ceil((dateObj - now) / 86400000);
+    }
+    function assessPlan(plan){
+      const v = state.vehicles.find(x=>x.id===plan.vehicleId);
+      if(!v) return {level:"bad",label:"Missing vehicle",sort:-999,details:["Missing vehicle"]};
+      const details = [];
+      let level = "ok";
+      let sort = 999999;
+      if(Number(plan.everyKm)>0){
+        const remaining = Number(plan.lastKm||0) + Number(plan.everyKm||0) - Number(v.currentKm||0);
+        details.push((remaining <= 0 ? "Overdue " + num(Math.abs(remaining)) + " km" : num(remaining) + " km left"));
+        sort = Math.min(sort, remaining);
+        if(remaining <= 0) level = "bad";
+        else if(remaining <= state.settings.soonKm && level !== "bad") level = "warn";
+      }
+      if(Number(plan.everyHours)>0){
+        const remaining = Number(plan.lastHours||0) + Number(plan.everyHours||0) - Number(v.currentHours||0);
+        details.push((remaining <= 0 ? "Overdue " + num(Math.abs(remaining)) + " hrs" : num(remaining) + " hrs left"));
+        sort = Math.min(sort, remaining * 20);
+        if(remaining <= 0) level = "bad";
+        else if(remaining <= state.settings.soonHours && level !== "bad") level = "warn";
+      }
+      if(Number(plan.everyMonths)>0){
+        const due = addMonths(plan.lastDate, plan.everyMonths);
+        const days = daysUntil(due);
+        if(days !== null){
+          details.push((days <= 0 ? "Overdue " + Math.abs(days) + " days" : days + " days left"));
+          sort = Math.min(sort, days * 20);
+          if(days <= 0) level = "bad";
+          else if(days <= state.settings.soonDays && level !== "bad") level = "warn";
+        }
+      }
+      if(!details.length) details.push("No interval set");
+      const label = level === "bad" ? "Due now" : level === "warn" ? "Soon" : "OK";
+      return {level,label,sort,details};
+    }
+    function planRows(){
+      return state.plans.map(p=>({...p,vehicle:state.vehicles.find(v=>v.id===p.vehicleId),due:assessPlan(p)}))
+        .sort((a,b)=>{
+          const rank = {bad:0,warn:1,ok:2};
+          return rank[a.due.level]-rank[b.due.level] || a.due.sort-b.due.sort || a.task.localeCompare(b.task);
+        });
+    }
+    function partRows(){
+      return state.parts.slice().sort((a,b)=>{
+        const ar = Number(a.qty||0) <= Number(a.reorder||0) ? 0 : 1;
+        const br = Number(b.qty||0) <= Number(b.reorder||0) ? 0 : 1;
+        return ar-br || a.name.localeCompare(b.name);
+      });
+    }
+    function setTab(tab){
+      state.activeTab = tab;
+      saveLocal();
+      render();
+    }
+    function render(){
+      byId("version-pill").textContent = VERSION;
+      renderTabs();
+      renderStatus();
+      const tab = state.activeTab || "Dashboard";
+      if(tab === "Dashboard") renderDashboard();
+      if(tab === "Vehicles") renderVehicles();
+      if(tab === "Service Plan") renderServicePlan();
+      if(tab === "History") renderHistory();
+      if(tab === "Parts") renderParts();
+      if(tab === "Review") renderReview();
+      renderSaveStatus();
+    }
+    function renderTabs(){
+      byId("tabs").innerHTML = tabs.map(t=>`<button class="tab ${state.activeTab===t?"active":""}" onclick="setTab('${t}')">${t}</button>`).join("");
+    }
+    function renderStatus(){
+      const rows = planRows();
+      const due = rows.filter(r=>r.due.level==="bad").length;
+      const soon = rows.filter(r=>r.due.level==="warn").length;
+      const low = state.parts.filter(p=>Number(p.qty||0)<=Number(p.reorder||0)).length;
+      byId("status-pills").innerHTML = `
+        <span class="pill ${due?"bad":"good"}">${due} due now</span>
+        <span class="pill ${soon?"warn":"good"}">${soon} coming up</span>
+        <span class="pill ${low?"warn":"good"}">${low} low parts</span>
+        <span class="pill">${state.vehicles.length} vehicles</span>`;
+    }
+    function renderDashboard(){
+      const rows = planRows();
+      const due = rows.filter(r=>r.due.level==="bad");
+      const soon = rows.filter(r=>r.due.level==="warn");
+      const cost30 = state.history.filter(h=>daysUntil(new Date(h.date+"T00:00:00"))>=-30).reduce((s,h)=>s+Number(h.cost||0),0);
+      byId("view").innerHTML = `
+        <div class="toolbar">
+          <h2>Dashboard</h2>
+          <div class="actions">
+            <button onclick="openCompleteService()">Complete service</button>
+            <button onclick="openReadingModal()">Update readings</button>
+            <button onclick="setTab('Review')">Review</button>
+          </div>
+        </div>
+        <section class="grid cols-4">
+          ${metric("Due now",due.length,"bad")}
+          ${metric("Coming up",soon.length,"warn")}
+          ${metric("Vehicles",state.vehicles.length,"")}
+          ${metric("30 day spend (ex GST)",money(cost30),"")}
+        </section>
+        <section class="grid cols-2" style="margin-top:12px">
+          <div>
+            <div class="toolbar"><h2>Priority work</h2><div class="actions"><button class="slim" onclick="openPlanModal()">Add task</button></div></div>
+            ${renderPlanTable(rows.filter(r=>r.due.level!=="ok").slice(0,8))}
+          </div>
+          <div>
+            <div class="toolbar"><h2>Fleet</h2><div class="actions"><button class="slim" onclick="openVehicleModal()">Add vehicle</button></div></div>
+            <div class="grid">${state.vehicles.map(vehicleCard).join("")}</div>
+          </div>
+        </section>`;
+    }
+    function metric(label,value,level){
+      return `<div class="card metric"><div class="num ${level==="bad"?"muted":""}">${value}</div><div class="label">${label}</div></div>`;
+    }
+    function vehicleCard(v){
+      const related = planRows().filter(r=>r.vehicleId===v.id);
+      const worst = related.find(r=>r.due.level==="bad") || related.find(r=>r.due.level==="warn") || related[0];
+      const status = worst ? worst.due : {level:"good",label:"OK",details:["No plan"]};
+      return `<div class="card vehicle-card">
+        <div class="vehicle-top">
+          <div>
+            <div class="vehicle-name">${esc(v.name)}</div>
+            <div class="meta"><span>${esc(v.type)}</span><span>${esc(v.rego||"No rego")}</span><span>${esc(v.assignedTo||"Unassigned")}</span></div>
+          </div>
+          <span class="pill ${status.level}">${status.label}</span>
+        </div>
+        <div class="kv">
+          <div><strong>${num(v.currentKm)}</strong><span>km</span></div>
+          <div><strong>${num(v.currentHours)}</strong><span>hours</span></div>
+        </div>
+        <div class="fine">${esc(worst ? worst.task + ": " + worst.due.details.join(", ") : "Add service tasks")}</div>
+        <div class="actions">
+          <button class="slim" onclick="selectVehicle('${v.id}')">Open</button>
+          <button class="slim" onclick="openReadingModal('${v.id}')">Readings</button>
+          <button class="slim" onclick="openVehicleModal('${v.id}')">Edit</button>
+        </div>
+      </div>`;
+    }
+    function selectVehicle(id){
+      state.selectedVehicleId = id;
+      state.activeTab = "Vehicles";
+      saveLocal();
+      render();
+    }
+    function renderVehicles(){
+      const selected = selectedVehicle();
+      byId("view").innerHTML = `
+        <div class="toolbar">
+          <h2>Vehicles</h2>
+          <div class="actions">
+            <button onclick="openVehicleModal()">Add vehicle</button>
+            <button onclick="openReadingModal('${selected ? selected.id : ""}')">Update readings</button>
+            <button onclick="openPlanModal(null,'${selected ? selected.id : ""}')">Add service task</button>
+          </div>
+        </div>
+        <div class="split">
+          <div class="side">${state.vehicles.map(v=>`<button class="${selected&&selected.id===v.id?"active":""}" onclick="selectVehicle('${v.id}')">${esc(v.name)}<br><span class="fine">${esc(v.type)} ${esc(v.rego||"")}</span></button>`).join("")}</div>
+          <div>${selected ? vehicleDetail(selected) : `<div class="empty">Add a vehicle to start.</div>`}</div>
+        </div>`;
+    }
+    function vehicleDetail(v){
+      const plans = planRows().filter(p=>p.vehicleId===v.id);
+      const history = state.history.filter(h=>h.vehicleId===v.id).sort((a,b)=>b.date.localeCompare(a.date)).slice(0,8);
+      return `<div class="grid">
+        <div class="card">
+          <div class="vehicle-top">
+            <div>
+              <h3>${esc(v.name)}</h3>
+              <div class="meta"><span>${esc(v.makeModel)}</span><span>${esc(v.year)}</span><span>${esc(v.location)}</span></div>
+            </div>
+            <span class="pill">${esc(v.status)}</span>
+          </div>
+          <div class="kv" style="margin-top:10px">
+            <div><strong>${num(v.currentKm)}</strong><span>km</span></div>
+            <div><strong>${num(v.currentHours)}</strong><span>hours</span></div>
+          </div>
+          <p class="fine">${esc(v.notes||"")}</p>
+          <div class="actions">
+            <button class="slim" onclick="openVehicleModal('${v.id}')">Edit vehicle</button>
+            <button class="slim" onclick="openReadingModal('${v.id}')">Update readings</button>
+            <button class="slim" onclick="openCompleteService(null,'${v.id}')">Complete service</button>
+          </div>
+        </div>
+        <div>
+          <div class="toolbar"><h2>Service plan</h2><div class="actions"><button class="slim" onclick="openPlanModal(null,'${v.id}')">Add task</button></div></div>
+          ${renderPlanTable(plans)}
+        </div>
+        <div>
+          <div class="toolbar"><h2>Recent history</h2><div class="actions"><button class="slim" onclick="openHistoryModal(null,'${v.id}')">Add history</button></div></div>
+          ${renderHistoryTable(history)}
+        </div>
+      </div>`;
+    }
+    function renderServicePlan(){
+      const selected = state.selectedVehicleId || "all";
+      const rows = selected === "all" ? planRows() : planRows().filter(p=>p.vehicleId===selected);
+      byId("view").innerHTML = `
+        <div class="toolbar">
+          <h2>Service Plan</h2>
+          <div class="actions">
+            <select aria-label="Vehicle filter" onchange="state.selectedVehicleId=this.value;saveLocal();render()">
+              <option value="all" ${selected==="all"?"selected":""}>All vehicles</option>
+              ${state.vehicles.map(v=>`<option value="${v.id}" ${selected===v.id?"selected":""}>${esc(v.name)}</option>`).join("")}
+            </select>
+            <button onclick="openPlanModal()">Add task</button>
+          </div>
+        </div>
+        ${renderPlanTable(rows)}`;
+    }
+    function renderPlanTable(rows){
+      if(!rows.length) return `<div class="empty">No service tasks.</div>`;
+      return `<div class="table-wrap"><table>
+        <thead><tr><th>Status</th><th>Vehicle</th><th>Task</th><th>Interval</th><th>Last done</th><th class="right">Actions</th></tr></thead>
+        <tbody>${rows.map(r=>`<tr>
+          <td><span class="pill ${r.due.level}">${r.due.label}</span><div class="fine">${esc(r.due.details.join(", "))}</div></td>
+          <td>${esc(vehicleName(r.vehicleId))}</td>
+          <td><strong>${esc(r.task)}</strong><div class="fine">${esc(r.parts||"")}</div></td>
+          <td>${intervalText(r)}</td>
+          <td>${niceDate(r.lastDate)}<div class="fine">${num(r.lastKm)} km / ${num(r.lastHours)} hrs</div></td>
+          <td class="right nowrap">
+            <button class="slim" onclick="openCompleteService('${r.id}')">Done</button>
+            <button class="slim" onclick="openPlanModal('${r.id}')">Edit</button>
+          </td>
+        </tr>`).join("")}</tbody>
+      </table></div>`;
+    }
+    function intervalText(p){
+      const bits = [];
+      if(Number(p.everyKm)>0) bits.push(num(p.everyKm) + " km");
+      if(Number(p.everyHours)>0) bits.push(num(p.everyHours) + " hrs");
+      if(Number(p.everyMonths)>0) bits.push(num(p.everyMonths) + " mths");
+      return bits.join("<br>") || "-";
+    }
+    function renderHistory(){
+      const q = esc((byId("hist-search")||{}).value || "");
+      const vehicleFilter = (byId("hist-vehicle")||{}).value || "all";
+      let rows = state.history.slice().sort((a,b)=>b.date.localeCompare(a.date));
+      if(q) rows = rows.filter(h => JSON.stringify(h).toLowerCase().includes(q.toLowerCase()));
+      if(vehicleFilter !== "all") rows = rows.filter(h=>h.vehicleId===vehicleFilter);
+      byId("view").innerHTML = `
+        <div class="toolbar">
+          <h2>History</h2>
+          <div class="actions"><button onclick="openHistoryModal()">Add history</button><button onclick="exportHistoryCsv()">Export CSV</button></div>
+        </div>
+        <div class="filter-row">
+          <input id="hist-search" placeholder="Search history" value="${q}" oninput="renderHistory()">
+          <select id="hist-vehicle" onchange="renderHistory()">
+            <option value="all">All vehicles</option>
+            ${state.vehicles.map(v=>`<option value="${v.id}" ${vehicleFilter===v.id?"selected":""}>${esc(v.name)}</option>`).join("")}
+          </select>
+          <button onclick="print()">Print</button>
+        </div>
+        ${renderHistoryTable(rows)}`;
+    }
+    function renderHistoryTable(rows){
+      if(!rows.length) return `<div class="empty">No history recorded.</div>`;
+      return `<div class="table-wrap"><table>
+        <thead><tr><th>Date</th><th>Vehicle</th><th>Work</th><th>Readings</th><th>Parts</th><th class="right">Cost</th><th></th></tr></thead>
+        <tbody>${rows.map(h=>`<tr>
+          <td>${niceDate(h.date)}</td>
+          <td>${esc(vehicleName(h.vehicleId))}</td>
+          <td><strong>${esc(h.task)}</strong><div class="fine">${esc(h.performedBy||"")} ${esc(h.notes||"")}</div></td>
+          <td>${num(h.km)} km<br>${num(h.hours)} hrs</td>
+          <td>${esc(h.parts||"")}</td>
+          <td class="right">${money(h.cost)}</td>
+          <td class="right nowrap"><button class="slim" onclick="openHistoryModal('${h.id}')">Edit</button></td>
+        </tr>`).join("")}</tbody>
+      </table></div>`;
+    }
+    function renderParts(){
+      const rows = partRows();
+      byId("view").innerHTML = `
+        <div class="toolbar">
+          <h2>Parts</h2>
+          <div class="actions"><button onclick="openPartModal()">Add part</button></div>
+        </div>
+        <div class="grid cols-3">${rows.map(p=>`<div class="card">
+          <div class="vehicle-top">
+            <div><h3>${esc(p.name)}</h3><div class="fine">${esc(p.partNo||"No part number")}</div></div>
+            <span class="pill ${Number(p.qty||0)<=Number(p.reorder||0)?"warn":"good"}">${Number(p.qty||0)<=Number(p.reorder||0)?"Reorder":"Stock OK"}</span>
+          </div>
+          <div class="kv">
+            <div><strong>${num(p.qty)}</strong><span>on hand</span></div>
+            <div><strong>${num(p.reorder)}</strong><span>reorder</span></div>
+          </div>
+          <p class="fine">${esc(p.supplier||"")} ${esc(p.location||"")}</p>
+          <p class="fine">${esc((p.vehicleIds||[]).map(vehicleName).join(", "))}</p>
+          <div class="actions">
+            <button class="slim" onclick="openPartModal('${p.id}')">Edit</button>
+            <button class="slim" onclick="adjustPart('${p.id}',-1)">Use 1</button>
+            <button class="slim" onclick="adjustPart('${p.id}',1)">Add 1</button>
+          </div>
+        </div>`).join("")}</div>`;
+    }
+    function renderReview(){
+      const rows = planRows();
+      const due = rows.filter(r=>r.due.level==="bad");
+      const soon = rows.filter(r=>r.due.level==="warn");
+      const low = partRows().filter(p=>Number(p.qty||0)<=Number(p.reorder||0));
+      byId("view").innerHTML = `
+        <div class="toolbar">
+          <h2>Review</h2>
+          <div class="actions">
+            <button onclick="backupJson()">Backup</button>
+            <button onclick="restoreJson()">Restore</button>
+            <button onclick="exportAllCsv()">Export CSV</button>
+            <button onclick="print()">Print</button>
+          </div>
+        </div>
+        <section class="grid cols-3">
+          ${metric("Due now",due.length,"bad")}
+          ${metric("Coming up",soon.length,"warn")}
+          ${metric("Low parts",low.length,"warn")}
+        </section>
+        <section style="margin-top:12px">
+          <div class="toolbar"><h2>Due now</h2></div>
+          ${renderPlanTable(due)}
+        </section>
+        <section style="margin-top:12px">
+          <div class="toolbar"><h2>Coming up</h2></div>
+          ${renderPlanTable(soon)}
+        </section>
+        <section style="margin-top:12px">
+          <div class="toolbar"><h2>Low parts</h2></div>
+          ${low.length ? `<div class="table-wrap"><table><thead><tr><th>Part</th><th>Supplier</th><th>Location</th><th class="right">Qty</th></tr></thead><tbody>${low.map(p=>`<tr><td>${esc(p.name)}<div class="fine">${esc(p.partNo)}</div></td><td>${esc(p.supplier)}</td><td>${esc(p.location)}</td><td class="right">${num(p.qty)}</td></tr>`).join("")}</tbody></table></div>` : `<div class="empty">No low parts.</div>`}
+        </section>`;
+    }
+    function openModal(title, body, saveLabel, onSave, extraButtons){
+      modalSave = onSave;
+      byId("modal-title").textContent = title;
+      byId("modal-body").innerHTML = body;
+      byId("modal-actions").innerHTML = `${extraButtons||""}<button onclick="closeModal()">Cancel</button><button class="primary" onclick="saveModal()">${saveLabel||"Save"}</button>`;
+      byId("modal-backdrop").classList.add("open");
+    }
+    function closeModal(){
+      byId("modal-backdrop").classList.remove("open");
+      modalSave = null;
+    }
+    function backdropClose(e){if(e.target.id==="modal-backdrop") closeModal()}
+    function saveModal(){if(modalSave) modalSave()}
+    function vehicleOptions(selected){
+      return state.vehicles.map(v=>`<option value="${v.id}" ${selected===v.id?"selected":""}>${esc(v.name)}</option>`).join("");
+    }
+    function openVehicleModal(id){
+      const v = state.vehicles.find(x=>x.id===id) || {id:null,name:"",rego:"",type:"Ute",makeModel:"",year:"",assignedTo:"Aaron",location:"",currentKm:0,currentHours:0,status:"Active",notes:""};
+      openModal(id?"Edit vehicle":"Add vehicle",`
+        <div class="form-grid">
+          <label>Name<input id="v-name" value="${esc(v.name)}"></label>
+          <label>Type<input id="v-type" value="${esc(v.type)}"></label>
+          <label>Rego<input id="v-rego" value="${esc(v.rego)}"></label>
+          <label>Make / model<input id="v-model" value="${esc(v.makeModel)}"></label>
+          <label>Year<input id="v-year" value="${esc(v.year)}"></label>
+          <label>Assigned to<input id="v-assigned" value="${esc(v.assignedTo)}"></label>
+          <label>Location<input id="v-location" value="${esc(v.location)}"></label>
+          <label>Status<select id="v-status"><option ${v.status==="Active"?"selected":""}>Active</option><option ${v.status==="Down"?"selected":""}>Down</option><option ${v.status==="Sold"?"selected":""}>Sold</option></select></label>
+          <label>Current km<input id="v-km" type="number" value="${Number(v.currentKm||0)}"></label>
+          <label>Current hours<input id="v-hours" type="number" value="${Number(v.currentHours||0)}"></label>
+          <label class="full">Notes<textarea id="v-notes">${esc(v.notes)}</textarea></label>
+        </div>`,
+        "Save vehicle",
+        ()=>mutate(()=>{
+          const next = {id:id||idNew("veh"),name:formVal("v-name")||"Unnamed vehicle",type:formVal("v-type"),rego:formVal("v-rego"),makeModel:formVal("v-model"),year:formVal("v-year"),assignedTo:formVal("v-assigned"),location:formVal("v-location"),status:formVal("v-status"),currentKm:formNum("v-km"),currentHours:formNum("v-hours"),notes:formVal("v-notes"),updatedAt:stampNow()};
+          if(id) state.vehicles = state.vehicles.map(x=>x.id===id?next:x); else state.vehicles.push(next);
+          state.selectedVehicleId = next.id;
+          closeModal();
+        }, id?"Vehicle updated":"Vehicle added")
+      );
+    }
+    function idNew(prefix){return prefix + "-" + Date.now().toString(36)}
+    function openReadingModal(vehicleId){
+      const v = state.vehicles.find(x=>x.id===vehicleId) || selectedVehicle() || state.vehicles[0];
+      if(!v) return;
+      openModal("Update readings",`
+        <div class="form-grid">
+          <label>Vehicle<select id="r-vehicle" onchange="fillReadings(this.value)">${vehicleOptions(v.id)}</select></label>
+          <label>Date<input id="r-date" type="date" value="${todayISO()}"></label>
+          <label>Current km<input id="r-km" type="number" value="${Number(v.currentKm||0)}"></label>
+          <label>Current hours<input id="r-hours" type="number" value="${Number(v.currentHours||0)}"></label>
+          <label class="full">Note<textarea id="r-note"></textarea></label>
+        </div>`,
+        "Save readings",
+        ()=>mutate(()=>{
+          const target = state.vehicles.find(x=>x.id===formVal("r-vehicle"));
+          if(target){
+            target.currentKm = formNum("r-km");
+            target.currentHours = formNum("r-hours");
+            target.updatedAt = stampNow();
+            const note = formVal("r-note");
+            if(note){
+              state.history.push({id:idNew("hist"),vehicleId:target.id,date:formVal("r-date")||todayISO(),task:"Reading update",km:target.currentKm,hours:target.currentHours,parts:"",cost:0,performedBy:"Aaron",notes:note,updatedAt:stampNow()});
+            }
+            state.selectedVehicleId = target.id;
+          }
+          closeModal();
+        },"Readings saved")
+      );
+    }
+    function fillReadings(vehicleId){
+      const v = state.vehicles.find(x=>x.id===vehicleId);
+      if(!v) return;
+      byId("r-km").value = Number(v.currentKm||0);
+      byId("r-hours").value = Number(v.currentHours||0);
+    }
+    function openPlanModal(id,vehicleId){
+      const p = state.plans.find(x=>x.id===id) || {id:null,vehicleId:vehicleId||state.selectedVehicleId||state.vehicles[0]?.id,task:"",priority:"Normal",everyKm:0,everyHours:0,everyMonths:0,lastKm:0,lastHours:0,lastDate:todayISO(),parts:"",estHours:0,supplier:"",notes:""};
+      openModal(id?"Edit service task":"Add service task",`
+        <div class="form-grid">
+          <label>Vehicle<select id="p-vehicle">${vehicleOptions(p.vehicleId)}</select></label>
+          <label>Priority<select id="p-priority"><option ${p.priority==="High"?"selected":""}>High</option><option ${p.priority==="Normal"?"selected":""}>Normal</option><option ${p.priority==="Low"?"selected":""}>Low</option></select></label>
+          <label class="full">Task<input id="p-task" value="${esc(p.task)}"></label>
+          <label>Every km<input id="p-km" type="number" value="${Number(p.everyKm||0)}"></label>
+          <label>Every hours<input id="p-hours" type="number" value="${Number(p.everyHours||0)}"></label>
+          <label>Every months<input id="p-months" type="number" value="${Number(p.everyMonths||0)}"></label>
+          <label>Last km<input id="p-last-km" type="number" value="${Number(p.lastKm||0)}"></label>
+          <label>Last hours<input id="p-last-hours" type="number" value="${Number(p.lastHours||0)}"></label>
+          <label>Last date<input id="p-last-date" type="date" value="${esc(p.lastDate||todayISO())}"></label>
+          <label>Estimated labour hours<input id="p-est" type="number" step="0.1" value="${Number(p.estHours||0)}"></label>
+          <label>Supplier<input id="p-supplier" value="${esc(p.supplier)}"></label>
+          <label class="full">Parts<input id="p-parts" value="${esc(p.parts)}"></label>
+          <label class="full">Notes<textarea id="p-notes">${esc(p.notes)}</textarea></label>
+        </div>`,
+        "Save task",
+        ()=>mutate(()=>{
+          const next = {id:id||idNew("plan"),vehicleId:formVal("p-vehicle"),task:formVal("p-task")||"Service task",priority:formVal("p-priority"),everyKm:formNum("p-km"),everyHours:formNum("p-hours"),everyMonths:formNum("p-months"),lastKm:formNum("p-last-km"),lastHours:formNum("p-last-hours"),lastDate:formVal("p-last-date")||todayISO(),parts:formVal("p-parts"),estHours:formNum("p-est"),supplier:formVal("p-supplier"),notes:formVal("p-notes"),updatedAt:stampNow()};
+          if(id) state.plans = state.plans.map(x=>x.id===id?next:x); else state.plans.push(next);
+          state.selectedVehicleId = next.vehicleId;
+          closeModal();
+        }, id?"Task updated":"Task added"),
+        id ? `<button class="danger" onclick="deletePlan('${id}')">Delete</button>` : ""
+      );
+    }
+    function deletePlan(id){
+      if(!confirm("Delete this service task?")) return;
+      mutate(()=>{state.plans = state.plans.filter(p=>p.id!==id); pendingDeletes.plans.push(id); closeModal();},"Task deleted");
+    }
+    function openCompleteService(planId,vehicleId){
+      const plan = state.plans.find(p=>p.id===planId);
+      const vId = vehicleId || plan?.vehicleId || state.selectedVehicleId || state.vehicles[0]?.id;
+      const v = state.vehicles.find(x=>x.id===vId);
+      if(!v) return;
+      const taskOptions = state.plans.filter(p=>p.vehicleId===v.id).map(p=>`<option value="${p.id}" ${p.id===planId?"selected":""}>${esc(p.task)}</option>`).join("");
+      openModal("Complete service",`
+        <div class="form-grid">
+          <label>Vehicle<select id="c-vehicle" onchange="refreshCompleteTasks(this.value)">${vehicleOptions(v.id)}</select></label>
+          <label>Date<input id="c-date" type="date" value="${todayISO()}"></label>
+          <label class="full">Planned task<select id="c-plan"><option value="">Manual service entry</option>${taskOptions}</select></label>
+          <label>Km<input id="c-km" type="number" value="${Number(v.currentKm||0)}"></label>
+          <label>Hours<input id="c-hours" type="number" value="${Number(v.currentHours||0)}"></label>
+          <label>Performed by<input id="c-by" value="Aaron"></label>
+          <label>Cost (ex GST)<input id="c-cost" type="number" value="0"></label>
+          <label class="full">Work completed<input id="c-task" value="${esc(plan ? plan.task : "")}"></label>
+          <label class="full">Parts used<input id="c-parts" value="${esc(plan ? plan.parts : "")}"></label>
+          <label class="full">Notes<textarea id="c-notes"></textarea></label>
+        </div>`,
+        "Complete service",
+        ()=>mutate(()=>{
+          const target = state.vehicles.find(x=>x.id===formVal("c-vehicle"));
+          const chosen = state.plans.find(p=>p.id===formVal("c-plan"));
+          if(target){
+            target.currentKm = formNum("c-km");
+            target.currentHours = formNum("c-hours");
+            target.updatedAt = stampNow();
+            if(chosen){
+              chosen.lastKm = target.currentKm;
+              chosen.lastHours = target.currentHours;
+              chosen.lastDate = formVal("c-date") || todayISO();
+              chosen.updatedAt = stampNow();
+            }
+            state.history.push({id:idNew("hist"),vehicleId:target.id,date:formVal("c-date")||todayISO(),task:formVal("c-task")||chosen?.task||"Service",km:target.currentKm,hours:target.currentHours,parts:formVal("c-parts"),cost:formNum("c-cost"),performedBy:formVal("c-by"),notes:formVal("c-notes"),updatedAt:stampNow()});
+            state.selectedVehicleId = target.id;
+          }
+          closeModal();
+        },"Service completed")
+      );
+    }
+    function refreshCompleteTasks(vehicleId){
+      const v = state.vehicles.find(x=>x.id===vehicleId);
+      if(!v) return;
+      byId("c-km").value = Number(v.currentKm||0);
+      byId("c-hours").value = Number(v.currentHours||0);
+      byId("c-plan").innerHTML = `<option value="">Manual service entry</option>` + state.plans.filter(p=>p.vehicleId===v.id).map(p=>`<option value="${p.id}">${esc(p.task)}</option>`).join("");
+    }
+    function openHistoryModal(id,vehicleId){
+      const h = state.history.find(x=>x.id===id) || {id:null,vehicleId:vehicleId||state.selectedVehicleId||state.vehicles[0]?.id,date:todayISO(),task:"",km:0,hours:0,parts:"",cost:0,performedBy:"Aaron",notes:""};
+      openModal(id?"Edit history":"Add history",`
+        <div class="form-grid">
+          <label>Vehicle<select id="h-vehicle">${vehicleOptions(h.vehicleId)}</select></label>
+          <label>Date<input id="h-date" type="date" value="${esc(h.date||todayISO())}"></label>
+          <label class="full">Work<input id="h-task" value="${esc(h.task)}"></label>
+          <label>Km<input id="h-km" type="number" value="${Number(h.km||0)}"></label>
+          <label>Hours<input id="h-hours" type="number" value="${Number(h.hours||0)}"></label>
+          <label>Performed by<input id="h-by" value="${esc(h.performedBy)}"></label>
+          <label>Cost (ex GST)<input id="h-cost" type="number" value="${Number(h.cost||0)}"></label>
+          <label class="full">Parts<input id="h-parts" value="${esc(h.parts)}"></label>
+          <label class="full">Notes<textarea id="h-notes">${esc(h.notes)}</textarea></label>
+        </div>`,
+        "Save history",
+        ()=>mutate(()=>{
+          const next = {id:id||idNew("hist"),vehicleId:formVal("h-vehicle"),date:formVal("h-date")||todayISO(),task:formVal("h-task")||"Service",km:formNum("h-km"),hours:formNum("h-hours"),parts:formVal("h-parts"),cost:formNum("h-cost"),performedBy:formVal("h-by"),notes:formVal("h-notes"),updatedAt:stampNow()};
+          if(id) state.history = state.history.map(x=>x.id===id?next:x); else state.history.push(next);
+          closeModal();
+        }, id?"History updated":"History added")
+      );
+    }
+    function openPartModal(id){
+      const p = state.parts.find(x=>x.id===id) || {id:null,name:"",partNo:"",supplier:"",qty:0,reorder:0,unitCost:0,location:"Workshop",vehicleIds:[],notes:""};
+      openModal(id?"Edit part":"Add part",`
+        <div class="form-grid">
+          <label>Name<input id="part-name" value="${esc(p.name)}"></label>
+          <label>Part number<input id="part-no" value="${esc(p.partNo)}"></label>
+          <label>Supplier<input id="part-supplier" value="${esc(p.supplier)}"></label>
+          <label>Location<input id="part-location" value="${esc(p.location)}"></label>
+          <label>Qty on hand<input id="part-qty" type="number" value="${Number(p.qty||0)}"></label>
+          <label>Reorder at<input id="part-reorder" type="number" value="${Number(p.reorder||0)}"></label>
+          <label>Unit cost (ex GST)<input id="part-cost" type="number" value="${Number(p.unitCost||0)}"></label>
+          <label class="full">Vehicles<select id="part-vehicles" multiple>${state.vehicles.map(v=>`<option value="${v.id}" ${(p.vehicleIds||[]).includes(v.id)?"selected":""}>${esc(v.name)}</option>`).join("")}</select></label>
+          <label class="full">Notes<textarea id="part-notes">${esc(p.notes)}</textarea></label>
+        </div>`,
+        "Save part",
+        ()=>mutate(()=>{
+          const sel = Array.from(byId("part-vehicles").selectedOptions).map(o=>o.value);
+          const next = {id:id||idNew("part"),name:formVal("part-name")||"Part",partNo:formVal("part-no"),supplier:formVal("part-supplier"),qty:formNum("part-qty"),reorder:formNum("part-reorder"),unitCost:formNum("part-cost"),location:formVal("part-location"),vehicleIds:sel,notes:formVal("part-notes"),updatedAt:stampNow()};
+          if(id) state.parts = state.parts.map(x=>x.id===id?next:x); else state.parts.push(next);
+          closeModal();
+        }, id?"Part updated":"Part added")
+      );
+    }
+    function adjustPart(id,delta){
+      mutate(()=>{
+        const p = state.parts.find(x=>x.id===id);
+        if(p){ p.qty = Math.max(0, Number(p.qty||0) + delta); p.updatedAt = stampNow(); }
+      },"Stock updated");
+    }
+    function toast(msg){
+      const el = byId("toast");
+      el.textContent = msg;
+      el.classList.add("show");
+      setTimeout(()=>el.classList.remove("show"),1800);
+    }
+    function backupJson(){
+      downloadBlob("pfe-vehicle-service-backup-" + todayISO() + ".json", JSON.stringify(state,null,2), "application/json");
+    }
+    function restoreJson(){
+      const input = byId("restore-file");
+      input.onchange = async () => {
+        const file = input.files[0];
+        if(!file) return;
+        const text = await file.text();
+        try{
+          const parsed = JSON.parse(text);
+          state = {...structuredClone(seedState),...parsed,updatedAt:new Date().toISOString()};
+          saveState();
+          render();
+          toast("Backup restored");
+        }catch(e){
+          alert("That backup file could not be read.");
+        }finally{
+          input.value = "";
+        }
+      };
+      input.click();
+    }
+    function exportHistoryCsv(){
+      const rows = [["Date","Vehicle","Task","Km","Hours","Parts","Cost","Performed by","Notes"],...state.history.map(h=>[h.date,vehicleName(h.vehicleId),h.task,h.km,h.hours,h.parts,h.cost,h.performedBy,h.notes])];
+      downloadBlob("pfe-service-history-" + todayISO() + ".csv", toCsv(rows), "text/csv");
+    }
+    function exportAllCsv(){
+      const rows = [["Section","Vehicle","Item","Status","Km","Hours","Date","Parts","Cost","Notes"]];
+      planRows().forEach(p=>rows.push(["Service Plan",vehicleName(p.vehicleId),p.task,p.due.label,p.lastKm,p.lastHours,p.lastDate,p.parts,"",p.notes]));
+      state.history.forEach(h=>rows.push(["History",vehicleName(h.vehicleId),h.task,"",h.km,h.hours,h.date,h.parts,h.cost,h.notes]));
+      state.parts.forEach(p=>rows.push(["Parts",(p.vehicleIds||[]).map(vehicleName).join("; "),p.name,Number(p.qty||0)<=Number(p.reorder||0)?"Reorder":"Stock OK","","","",p.partNo,p.unitCost,p.notes]));
+      downloadBlob("pfe-vehicle-service-review-" + todayISO() + ".csv", toCsv(rows), "text/csv");
+    }
+    function toCsv(rows){
+      return rows.map(r=>r.map(cell=>`"${String(cell ?? "").replaceAll("\"","\"\"")}"`).join(",")).join("\n");
+    }
+    function downloadBlob(name,content,type){
+      const blob = new Blob([content],{type});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = name;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    }
+    render();
+    if(SCRIPT_URL){ pullFromSheet(); setInterval(pollSheet, 30000); }
+  </script>
+</body>
+</html>
