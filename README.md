@@ -4,7 +4,7 @@ Vehicle and equipment service tracker for Peel Forest Estate. Single-file PWA �
 
 - **Live:** https://brendon-graham.github.io/pfe-vehicle-service/
 - **Users:** Aaron (update readings, complete services, add parts, note defects) and Brendon (review overdue/upcoming work, costs, history, export reports).
-- **Version:** v1.1.0
+- **Version:** v1.2.0
 
 ## Data
 
@@ -27,6 +27,7 @@ Settings → Pages → Deploy from a branch → `main` → `/ (root)`.
 
 ## Notes
 
-- Sample/seed data is for demo only — replace with the real fleet before live use.
+- Fleet loaded (v1.2.0): 18 vehicles — 6 utes, 7 trailers, 5 tractors/loaders. The 4 EROAD D-Maxes (KBW797, LAF516, QLS732, QLS733) keep their imported odometer readings.
+- Still to confirm/add: engine hours on tractors/loaders, odometers on the Navara + JSG473, WOF/rego/service intervals, and 5 trailer regos.
 - Do not connect sync on a device holding seed data — clear it first.
 - Project docs, design specs, and version snapshots live in the AI Brain: `ai-brain/layer-4-projects/vehicle-service-app/`.

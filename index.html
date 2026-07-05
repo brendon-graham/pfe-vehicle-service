@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="app-version" content="v1.1.0">
+  <meta name="app-version" content="v1.2.0">
   <title>PFE Vehicle Service</title>
   <style>
     :root{
@@ -143,7 +143,7 @@
           </div>
         </div>
         <div class="head-actions">
-          <span class="pill" id="version-pill">v1.1.0</span>
+          <span class="pill" id="version-pill">v1.2.0</span>
           <button class="primary" onclick="openCompleteService()">Complete service</button>
           <button onclick="openVehicleModal()">Add vehicle</button>
         </div>
@@ -173,7 +173,7 @@
   <input type="file" id="restore-file" accept="application/json" hidden>
 
   <script>
-    const VERSION = "v1.1.0";
+    const VERSION = "v1.2.0";
     const STORAGE_KEY = "pfe_vehicle_service_v1";
     // Google Sheets sync. Paste the Apps Script Web App URL to turn sync ON.
     // Empty string = sync OFF, localStorage only (safe default — nothing leaves the device).
@@ -189,27 +189,34 @@
     const tabs = ["Dashboard","Vehicles","Service Plan","History","Parts","Review"];
     const seedState = {
       activeTab:"Dashboard",
-      selectedVehicleId:"veh-ute",
+      selectedVehicleId:"veh-brendon-qls732",
       settings:{soonKm:500,soonHours:25,soonDays:30,currency:"NZD"},
       vehicles:[
-        {id:"veh-ute",name:"Sample Ute",rego:"PFE001",type:"Ute",makeModel:"Replace with real vehicle",year:"2021",assignedTo:"Aaron",location:"Workshop",currentKm:84210,currentHours:0,status:"Active",notes:"Sample data. Replace before live use."},
-        {id:"veh-tractor",name:"Sample Tractor",rego:"",type:"Tractor",makeModel:"Replace with real machine",year:"2018",assignedTo:"Aaron",location:"Main yard",currentKm:0,currentHours:3120,status:"Active",notes:"Sample data. Track by hours."},
-        {id:"veh-bike",name:"Sample Side-by-side",rego:"PFE002",type:"Utility vehicle",makeModel:"Replace with real unit",year:"2020",assignedTo:"Aaron",location:"Main yard",currentKm:18240,currentHours:640,status:"Active",notes:"Sample data. Track by km and hours if both are useful."}
+        // --- Utes / motor vehicles ---
+        {id:"veh-doug-bhu960",name:"Nissan Navara - BHU960",rego:"BHU960",type:"Ute",makeModel:"Nissan Navara",year:"1997",assignedTo:"Doug Hopkirk",location:"Peel Forest",currentKm:0,currentHours:0,status:"Active",notes:"PFE. Add odometer, WOF, rego, and service intervals.",updatedAt:new Date().toISOString()},
+        {id:"veh-anuar-kbw797",name:"Isuzu D-Max - KBW797",rego:"KBW797",type:"Ute",makeModel:"Isuzu D-Max",year:"2016",assignedTo:"Anuar Jalil",location:"Peel Forest",currentKm:156896.5,currentHours:0,status:"Active",notes:"PFE. Odometer from EROAD screenshot 5 Jul 2026. Add WOF, rego, and service intervals.",updatedAt:new Date().toISOString()},
+        {id:"veh-aaron-laf516",name:"Isuzu D-Max - LAF516",rego:"LAF516",type:"Ute",makeModel:"Isuzu D-Max",year:"2017",assignedTo:"Aaron Jarrett",location:"Peel Forest",currentKm:125275.7,currentHours:0,status:"Active",notes:"PFE. Odometer from EROAD screenshot 5 Jul 2026. Add WOF, rego, and service intervals.",updatedAt:new Date().toISOString()},
+        {id:"veh-helen-jsg473",name:"Isuzu D-Max - JSG473",rego:"JSG473",type:"Ute",makeModel:"Isuzu D-Max",year:"2016",assignedTo:"Helen",location:"Peel Forest",currentKm:0,currentHours:0,status:"Active",notes:"PFE. Add odometer, WOF, rego, and service intervals.",updatedAt:new Date().toISOString()},
+        {id:"veh-brendon-qls732",name:"Isuzu D-Max - QLS732",rego:"QLS732",type:"Ute",makeModel:"Isuzu D-Max",year:"2024",assignedTo:"Brendon Graham",location:"Peel Forest",currentKm:62761.6,currentHours:0,status:"Active",notes:"PFE. Odometer from EROAD screenshot 5 Jul 2026. Add WOF, rego, and service intervals.",updatedAt:new Date().toISOString()},
+        {id:"veh-henry-qls733",name:"Isuzu D-Max - QLS733",rego:"QLS733",type:"Ute",makeModel:"Isuzu D-Max",year:"2024",assignedTo:"Henry Wilson",location:"Peel Forest",currentKm:41376.9,currentHours:0,status:"Active",notes:"PFE. Odometer from EROAD screenshot 5 Jul 2026. Add WOF, rego, and service intervals.",updatedAt:new Date().toISOString()},
+        // --- Trailers ---
+        {id:"veh-trailer-briford",name:"Briford Trailer",rego:"567Yi",type:"Trailer",makeModel:"Briford",year:"",assignedTo:"",location:"Peel Forest",currentKm:0,currentHours:0,status:"Active",notes:"PFE trailer. Confirm rego / plate. Add WOF and inspection intervals.",updatedAt:new Date().toISOString()},
+        {id:"veh-trailer-deer",name:"Deer Trailer",rego:"4A737",type:"Trailer",makeModel:"",year:"",assignedTo:"",location:"Peel Forest",currentKm:0,currentHours:0,status:"Active",notes:"PFE trailer. Add WOF and inspection intervals.",updatedAt:new Date().toISOString()},
+        {id:"veh-trailer-lowloader",name:"Low Loader Trailer",rego:"",type:"Trailer",makeModel:"",year:"",assignedTo:"",location:"Peel Forest",currentKm:0,currentHours:0,status:"Active",notes:"PFE trailer. Rego unknown - to confirm. Add WOF and inspection intervals.",updatedAt:new Date().toISOString()},
+        {id:"veh-trailer-pk",name:"PK Trailer & backing attachment",rego:"",type:"Trailer",makeModel:"",year:"",assignedTo:"",location:"Peel Forest",currentKm:0,currentHours:0,status:"Active",notes:"PFE trailer. Rego unknown - to confirm. Includes backing attachment.",updatedAt:new Date().toISOString()},
+        {id:"veh-trailer-pke",name:"PKE Trailer",rego:"",type:"Trailer",makeModel:"",year:"",assignedTo:"",location:"Peel Forest",currentKm:0,currentHours:0,status:"Active",notes:"PFE trailer. Rego unknown - to confirm.",updatedAt:new Date().toISOString()},
+        {id:"veh-trailer-twoaxle",name:"Two Axle Transport Trailer",rego:"",type:"Trailer",makeModel:"",year:"",assignedTo:"",location:"Peel Forest",currentKm:0,currentHours:0,status:"Active",notes:"PFE trailer. Rego unknown - to confirm.",updatedAt:new Date().toISOString()},
+        {id:"veh-trailer-ward8t",name:"Ward 8 Tonne Trailer",rego:"",type:"Trailer",makeModel:"Ward",year:"",assignedTo:"",location:"Peel Forest",currentKm:0,currentHours:0,status:"Active",notes:"PFE trailer, 8 tonne. Rego unknown - to confirm.",updatedAt:new Date().toISOString()},
+        // --- Tractors / loaders ---
+        {id:"veh-jd-6175m",name:"John Deere 6175M",rego:"C4DCW",type:"Tractor",makeModel:"John Deere 6175M",year:"",assignedTo:"",location:"Peel Forest",currentKm:0,currentHours:0,status:"Active",notes:"PFE tractor. Add engine hours and service intervals.",updatedAt:new Date().toISOString()},
+        {id:"veh-jd-6530",name:"John Deere 6530",rego:"94ZHG",type:"Tractor",makeModel:"John Deere 6530",year:"",assignedTo:"",location:"Peel Forest",currentKm:0,currentHours:0,status:"Active",notes:"PFE tractor. Add engine hours and service intervals.",updatedAt:new Date().toISOString()},
+        {id:"veh-loadmax-wl200e",name:"Loadmax WL200E Loader",rego:"",type:"Loader",makeModel:"Loadmax WL200E",year:"2019",assignedTo:"",location:"Peel Forest",currentHours:0,currentKm:0,status:"Active",notes:"PFE wheel loader. Add engine hours and service intervals.",updatedAt:new Date().toISOString()},
+        {id:"veh-valtra-t175ev",name:"Valtra T175ev",rego:"C7YWY",type:"Tractor",makeModel:"Valtra T175ev",year:"",assignedTo:"",location:"Peel Forest",currentKm:0,currentHours:0,status:"Active",notes:"PFE tractor. Add engine hours and service intervals.",updatedAt:new Date().toISOString()},
+        {id:"veh-manitou",name:"Manitou Telehandler",rego:"",type:"Loader",makeModel:"Manitou",year:"",assignedTo:"",location:"Peel Forest",currentHours:0,currentKm:0,status:"Active",notes:"PFE telehandler (listed as 'Manatou' - confirm model/plate). Add engine hours and service intervals.",updatedAt:new Date().toISOString()}
       ],
-      plans:[
-        {id:"plan-ute-oil",vehicleId:"veh-ute",task:"Engine oil and filter",priority:"High",everyKm:10000,everyHours:0,everyMonths:12,lastKm:76000,lastHours:0,lastDate:"2025-11-20",parts:"Oil filter, engine oil",estHours:1.5,supplier:"Local parts supplier",notes:"Check air filter while open."},
-        {id:"plan-ute-wof",vehicleId:"veh-ute",task:"WOF and road licence check",priority:"High",everyKm:0,everyHours:0,everyMonths:6,lastKm:82000,lastHours:0,lastDate:"2026-02-15",parts:"",estHours:0.5,supplier:"Testing station",notes:"Book ahead."},
-        {id:"plan-tractor-service",vehicleId:"veh-tractor",task:"250 hour service",priority:"High",everyKm:0,everyHours:250,everyMonths:12,lastKm:0,lastHours:2920,lastDate:"2026-01-12",parts:"Engine oil, filters, grease",estHours:3,supplier:"Dealer",notes:"Grease loader pins."},
-        {id:"plan-bike-service",vehicleId:"veh-bike",task:"General service",priority:"Normal",everyKm:5000,everyHours:100,everyMonths:6,lastKm:15000,lastHours:560,lastDate:"2026-02-01",parts:"Oil, plug, air filter",estHours:1.5,supplier:"Small engines",notes:"Check tyres and brakes."}
-      ],
-      history:[
-        {id:"hist-1",vehicleId:"veh-ute",date:"2026-02-15",task:"Tyres rotated and WOF check",km:82000,hours:0,parts:"",cost:185,performedBy:"Aaron",notes:"No faults found."},
-        {id:"hist-2",vehicleId:"veh-tractor",date:"2026-01-12",task:"Full service",km:0,hours:2920,parts:"Filters, oil",cost:760,performedBy:"Dealer",notes:"Next service at 3170 hours."}
-      ],
-      parts:[
-        {id:"part-oil-filter",name:"Oil filter",partNo:"TBC",supplier:"Local parts supplier",qty:3,reorder:2,unitCost:42,location:"Workshop shelf",vehicleIds:["veh-ute","veh-bike"],notes:"Confirm part numbers."},
-        {id:"part-grease",name:"Grease cartridges",partNo:"TBC",supplier:"Farm supplier",qty:9,reorder:6,unitCost:11,location:"Workshop",vehicleIds:["veh-tractor"],notes:""}
-      ],
+      plans:[],
+      history:[],
+      parts:[],
       updatedAt:new Date().toISOString()
     };
     let state = loadState();
@@ -220,10 +227,27 @@
         const raw = localStorage.getItem(STORAGE_KEY);
         if(!raw) return structuredClone(seedState);
         const parsed = JSON.parse(raw);
-        return {...structuredClone(seedState),...parsed};
+        const merged = {...structuredClone(seedState),...parsed};
+        if(isSampleOnlyFleet(parsed)) return structuredClone(seedState);
+        return merged;
       }catch(e){
         return structuredClone(seedState);
       }
+    }
+    function isSampleOnlyFleet(data){
+      const vehicles = data?.vehicles || [];
+      if(!vehicles.length) return false;
+      // Original Codex sample fleet.
+      if(vehicles.every(v => ["veh-ute","veh-tractor","veh-bike"].includes(v.id) || String(v.name||"").startsWith("Sample "))) return true;
+      // Untouched 5 Jul EROAD-only seed (4 D-Maxes, no user-added vehicles or history) —
+      // superseded by the full fleet load. Reseed so devices pick up all vehicles.
+      const eroadIds = ["veh-aaron-laf516","veh-anuar-kbw797","veh-brendon-qls732","veh-henry-qls733"];
+      const ids = vehicles.map(v=>v.id);
+      const onlyEroad = vehicles.length===4 && ids.every(i=>eroadIds.includes(i));
+      const historyIds = (data?.history||[]).map(h=>h.id);
+      const seedHistoryOnly = historyIds.every(i=>String(i).startsWith("hist-eroad-"));
+      if(onlyEroad && seedHistoryOnly) return true;
+      return false;
     }
     function saveLocal(){
       state.updatedAt = new Date().toISOString();
