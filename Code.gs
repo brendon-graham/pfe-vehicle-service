@@ -21,7 +21,7 @@
 const SHEET_ID = "";
 
 const HEADERS = {
-  Vehicles: ["id","name","rego","type","makeModel","year","assignedTo","location","currentKm","currentHours","status","notes","updatedAt"],
+  Vehicles: ["id","name","rego","type","makeModel","year","assignedTo","location","currentKm","currentHours","status","notes","updatedAt","category"],  // category appended at END (never insert mid-schema)
   Plans:    ["id","vehicleId","task","priority","everyKm","everyHours","everyMonths","lastKm","lastHours","lastDate","parts","estHours","supplier","notes","updatedAt"],
   History:  ["id","vehicleId","date","task","km","hours","parts","cost","performedBy","notes","updatedAt"],
   Parts:    ["id","name","partNo","supplier","qty","reorder","unitCost","location","vehicleIds","notes","updatedAt"],
