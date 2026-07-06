@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="app-version" content="v1.2.0">
+  <meta name="app-version" content="v1.3.0">
   <title>PFE Vehicle Service</title>
   <style>
     :root{
@@ -103,6 +103,14 @@
     .form-grid .full{grid-column:1/-1}
     .toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:var(--ink);color:#fff;border-radius:999px;padding:10px 14px;font-weight:800;display:none;z-index:40}
     .toast.show{display:block}
+    .group-head{margin:14px 0 8px;font-size:12px;font-weight:900;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+    .group-head:first-child{margin-top:0}
+    .check-item{display:grid;grid-template-columns:1fr 120px;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)}
+    .check-item .ci-note{grid-column:1/-1}
+    .check-item .ci-label{font-weight:700;font-size:14px}
+    .check-item select[data-flag="flag"]{border-color:var(--bad);background:var(--bad-bg);color:var(--bad)}
+    .check-item select[data-flag="watch"]{border-color:var(--warn);background:var(--warn-bg);color:var(--warn)}
+    .flag-note{font-weight:700}
     @media (max-width:860px){
       .grid.cols-2,.grid.cols-3,.grid.cols-4{grid-template-columns:1fr}
       .split{grid-template-columns:1fr}
@@ -143,7 +151,7 @@
           </div>
         </div>
         <div class="head-actions">
-          <span class="pill" id="version-pill">v1.2.0</span>
+          <span class="pill" id="version-pill">v1.3.0</span>
           <button class="primary" onclick="openCompleteService()">Complete service</button>
           <button onclick="openVehicleModal()">Add vehicle</button>
         </div>
@@ -173,7 +181,7 @@
   <input type="file" id="restore-file" accept="application/json" hidden>
 
   <script>
-    const VERSION = "v1.2.0";
+    const VERSION = "v1.3.0";
     const STORAGE_KEY = "pfe_vehicle_service_v1";
     // Google Sheets sync. Paste the Apps Script Web App URL to turn sync ON.
     // Empty string = sync OFF, localStorage only (safe default — nothing leaves the device).
@@ -183,14 +191,46 @@
     let isPushing = false;     // a push is in flight
     let pushAgain = false;     // an edit landed mid-push — push again after
     let pushTimer = null;
-    let pendingDeletes = {vehicles:[],plans:[],history:[],parts:[]};
+    let pendingDeletes = {vehicles:[],plans:[],history:[],parts:[],checks:[]};
     const stampNow = () => new Date().toISOString();
     const todayISO = () => new Date().toISOString().slice(0,10);
-    const tabs = ["Dashboard","Vehicles","Service Plan","History","Parts","Review"];
+    const tabs = ["Dashboard","Weekly Check","Vehicles","Service Plan","History","Parts","Review"];
+    const CAT_ORDER = ["Vehicle","Trailer","Implement"];
+    const CAT_LABEL = {Vehicle:"Vehicles",Trailer:"Trailers",Implement:"Implements"};
+    const IMPLEMENT_HINTS = ["implement","mower","mulcher","topper","drill","sprayer","roller","grader","post driver","spreader","rake","tedder","baler","cultivator","ripper","subsoiler","auger"];
+    const DEFAULT_STAFF = ["Aaron Jarrett","Henry Wilson","Anuar Jalil","Hayden Coe","Jack Goodwin","Dylan Miller","Doug Hopkirk","Brendon Graham"];
+    const CHECK_DUE_DAYS = 7;
+    const VEHICLE_CHECK = [
+      {key:"fluids",label:"Fluids (oil, coolant, water)"},
+      {key:"tyres",label:"Tyres & wheels"},
+      {key:"lights",label:"Lights & indicators"},
+      {key:"leaks",label:"Leaks (oil, hydraulic, fuel)"},
+      {key:"brakes",label:"Brakes & steering"},
+      {key:"damage",label:"Damage, glass, mirrors"},
+      {key:"dash",label:"Dash warning lights"},
+      {key:"clean",label:"Clean, no loose gear"}
+    ];
+    const TRAILER_CHECK = [
+      {key:"tyres",label:"Tyres & wheels"},
+      {key:"lights",label:"Lights & indicators"},
+      {key:"coupling",label:"Coupling & safety chain"},
+      {key:"brakes",label:"Brakes"},
+      {key:"deck",label:"Deck, ramps, gates"},
+      {key:"wof",label:"WOF current"},
+      {key:"damage",label:"Damage / rust"}
+    ];
+    const IMPLEMENT_CHECK = [
+      {key:"guards",label:"Guards & PTO cover"},
+      {key:"grease",label:"Greasing points"},
+      {key:"hyd",label:"Hydraulic hoses & leaks"},
+      {key:"wear",label:"Tines / blades / wear parts"},
+      {key:"bolts",label:"Bolts & pins tight"},
+      {key:"damage",label:"Damage"}
+    ];
     const seedState = {
       activeTab:"Dashboard",
       selectedVehicleId:"veh-brendon-qls732",
-      settings:{soonKm:500,soonHours:25,soonDays:30,currency:"NZD"},
+      settings:{soonKm:500,soonHours:25,soonDays:30,currency:"NZD",staff:DEFAULT_STAFF,lastStaff:""},
       vehicles:[
         // --- Utes / motor vehicles ---
         {id:"veh-doug-bhu960",name:"Nissan Navara - BHU960",rego:"BHU960",type:"Ute",makeModel:"Nissan Navara",year:"1997",assignedTo:"Doug Hopkirk",location:"Peel Forest",currentKm:0,currentHours:0,status:"Active",notes:"PFE. Add odometer, WOF, rego, and service intervals.",updatedAt:new Date().toISOString()},
@@ -217,6 +257,7 @@
       plans:[],
       history:[],
       parts:[],
+      checks:[],
       updatedAt:new Date().toISOString()
     };
     let state = loadState();
@@ -229,6 +270,9 @@
         const parsed = JSON.parse(raw);
         const merged = {...structuredClone(seedState),...parsed};
         if(isSampleOnlyFleet(parsed)) return structuredClone(seedState);
+        merged.settings = {...structuredClone(seedState.settings),...(parsed.settings||{})};
+        if(!Array.isArray(merged.settings.staff) || !merged.settings.staff.length) merged.settings.staff = DEFAULT_STAFF.slice();
+        if(!Array.isArray(merged.checks)) merged.checks = [];
         return merged;
       }catch(e){
         return structuredClone(seedState);
@@ -279,6 +323,7 @@
         plans: state.plans,
         history: state.history,
         parts: state.parts.map(p=>({...p,vehicleIds:(p.vehicleIds||[]).join("|")})),
+        checks: state.checks.map(c=>({...c,items:JSON.stringify(c.items||[])})),
         settings: state.settings,
         deletes: pendingDeletes,
         lastModified: localStorage.getItem(LASTMOD_KEY) || ""
@@ -290,6 +335,7 @@
       if(Array.isArray(srv.plans)) state.plans = srv.plans;
       if(Array.isArray(srv.history)) state.history = srv.history;
       if(Array.isArray(srv.parts)) state.parts = srv.parts.map(p=>({...p,vehicleIds:typeof p.vehicleIds==="string"?p.vehicleIds.split("|").filter(Boolean):(p.vehicleIds||[])}));
+      if(Array.isArray(srv.checks)) state.checks = srv.checks.map(c=>({...c,items:typeof c.items==="string"?(()=>{try{return JSON.parse(c.items)}catch(e){return []}})():(c.items||[])}));
       if(srv.settings) state.settings = {...state.settings, ...srv.settings};
       saveLocal();
       render();
@@ -310,7 +356,7 @@
         const data = await res.json();
         if(data && data.status === "ok"){
           localStorage.setItem(LASTMOD_KEY, data.lastModified||"");
-          pendingDeletes = {vehicles:[],plans:[],history:[],parts:[]};
+          pendingDeletes = {vehicles:[],plans:[],history:[],parts:[],checks:[]};
           syncPending = false;
           if(data.data) applyServer(data.data);
         }else{
@@ -364,6 +410,50 @@
     }
     function selectedVehicle(){
       return state.vehicles.find(v=>v.id===state.selectedVehicleId) || state.vehicles[0];
+    }
+    function vehCategory(v){
+      if(!v) return "Vehicle";
+      if(v.category) return v.category;
+      const t = String(v.type||"").toLowerCase();
+      if(t.includes("trailer")) return "Trailer";
+      if(IMPLEMENT_HINTS.some(x=>t.includes(x))) return "Implement";
+      return "Vehicle";
+    }
+    function showsKmHours(v){return vehCategory(v)==="Vehicle"}
+    function checkItemsFor(cat){
+      if(cat==="Trailer") return TRAILER_CHECK;
+      if(cat==="Implement") return IMPLEMENT_CHECK;
+      return VEHICLE_CHECK;
+    }
+    function vehiclesByCategory(){
+      return CAT_ORDER.map(cat=>({cat,label:CAT_LABEL[cat],items:state.vehicles.filter(v=>vehCategory(v)===cat)}))
+        .filter(g=>g.items.length);
+    }
+    function lastCheck(vehicleId){
+      return state.checks.filter(c=>c.vehicleId===vehicleId)
+        .sort((a,b)=>String(b.date).localeCompare(String(a.date)))[0] || null;
+    }
+    function checkDue(v){
+      const last = lastCheck(v.id);
+      if(!last) return {level:"warn",label:"Never checked",days:null};
+      const days = -daysUntil(new Date(last.date+"T00:00:00"));
+      if(days>CHECK_DUE_DAYS) return {level:"warn",label:"Check due",days};
+      return {level:"good",label:"Checked "+niceDate(last.date),days};
+    }
+    function openFlags(status){
+      const out = [];
+      state.checks.forEach(c=>{
+        (c.items||[]).forEach(it=>{
+          if(it.status===status && !it.resolved){
+            out.push({checkId:c.id,itemKey:it.key,label:it.label,note:it.note||"",vehicleId:c.vehicleId,date:c.date,checkedBy:c.checkedBy||""});
+          }
+        });
+      });
+      return out.sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+    }
+    function staffOptions(selected){
+      const list = (state.settings.staff||DEFAULT_STAFF);
+      return list.map(n=>`<option value="${esc(n)}" ${selected===n?"selected":""}>${esc(n)}</option>`).join("");
     }
     function byId(id){return document.getElementById(id)}
     function formVal(id){const el = byId(id); return el ? el.value.trim() : ""}
@@ -452,6 +542,7 @@
       renderStatus();
       const tab = state.activeTab || "Dashboard";
       if(tab === "Dashboard") renderDashboard();
+      if(tab === "Weekly Check") renderWeeklyCheck();
       if(tab === "Vehicles") renderVehicles();
       if(tab === "Service Plan") renderServicePlan();
       if(tab === "History") renderHistory();
@@ -467,40 +558,51 @@
       const due = rows.filter(r=>r.due.level==="bad").length;
       const soon = rows.filter(r=>r.due.level==="warn").length;
       const low = state.parts.filter(p=>Number(p.qty||0)<=Number(p.reorder||0)).length;
+      const flags = openFlags("flag").length;
       byId("status-pills").innerHTML = `
+        <span class="pill ${flags?"bad":"good"}">${flags} red flags</span>
         <span class="pill ${due?"bad":"good"}">${due} due now</span>
         <span class="pill ${soon?"warn":"good"}">${soon} coming up</span>
         <span class="pill ${low?"warn":"good"}">${low} low parts</span>
-        <span class="pill">${state.vehicles.length} vehicles</span>`;
+        <span class="pill">${state.vehicles.length} units</span>`;
     }
     function renderDashboard(){
       const rows = planRows();
       const due = rows.filter(r=>r.due.level==="bad");
       const soon = rows.filter(r=>r.due.level==="warn");
+      const flags = openFlags("flag");
+      const checkDueCount = state.vehicles.filter(v=>vehCategory(v)!=="Implement" && v.status!=="Sold" && checkDue(v).level!=="good").length;
       const cost30 = state.history.filter(h=>daysUntil(new Date(h.date+"T00:00:00"))>=-30).reduce((s,h)=>s+Number(h.cost||0),0);
       byId("view").innerHTML = `
         <div class="toolbar">
           <h2>Dashboard</h2>
           <div class="actions">
+            <button onclick="setTab('Weekly Check')">Weekly check</button>
             <button onclick="openCompleteService()">Complete service</button>
             <button onclick="openReadingModal()">Update readings</button>
-            <button onclick="setTab('Review')">Review</button>
           </div>
         </div>
         <section class="grid cols-4">
+          ${metric("Red flags",flags.length,"bad")}
           ${metric("Due now",due.length,"bad")}
           ${metric("Coming up",soon.length,"warn")}
-          ${metric("Vehicles",state.vehicles.length,"")}
           ${metric("30 day spend (ex GST)",money(cost30),"")}
         </section>
+        ${(flags.length||checkDueCount)?`<section class="card" style="margin-top:12px">
+          <div class="vehicle-top">
+            <h3>For the toolbox meeting</h3>
+            <button class="slim" onclick="setTab('Weekly Check')">Open weekly check</button>
+          </div>
+          <p class="fine">${flags.length?`<strong>${flags.length}</strong> red flag${flags.length===1?"":"s"} raised by staff.`:"No red flags."} ${checkDueCount?`<strong>${checkDueCount}</strong> unit${checkDueCount===1?"":"s"} need a weekly check.`:"All checks up to date."}</p>
+        </section>`:""}
         <section class="grid cols-2" style="margin-top:12px">
           <div>
             <div class="toolbar"><h2>Priority work</h2><div class="actions"><button class="slim" onclick="openPlanModal()">Add task</button></div></div>
             ${renderPlanTable(rows.filter(r=>r.due.level!=="ok").slice(0,8))}
           </div>
           <div>
-            <div class="toolbar"><h2>Fleet</h2><div class="actions"><button class="slim" onclick="openVehicleModal()">Add vehicle</button></div></div>
-            <div class="grid">${state.vehicles.map(vehicleCard).join("")}</div>
+            <div class="toolbar"><h2>Fleet</h2><div class="actions"><button class="slim" onclick="openVehicleModal()">Add unit</button></div></div>
+            ${vehiclesByCategory().map(g=>`<div class="group-head">${g.label} (${g.items.length})</div><div class="grid">${g.items.map(vehicleCard).join("")}</div>`).join("")}
           </div>
         </section>`;
     }
@@ -511,22 +613,23 @@
       const related = planRows().filter(r=>r.vehicleId===v.id);
       const worst = related.find(r=>r.due.level==="bad") || related.find(r=>r.due.level==="warn") || related[0];
       const status = worst ? worst.due : {level:"good",label:"OK",details:["No plan"]};
+      const flags = openFlags("flag").filter(f=>f.vehicleId===v.id);
+      const kv = showsKmHours(v)
+        ? `<div class="kv"><div><strong>${num(v.currentKm)}</strong><span>km</span></div><div><strong>${num(v.currentHours)}</strong><span>hours</span></div></div>`
+        : "";
       return `<div class="card vehicle-card">
         <div class="vehicle-top">
           <div>
             <div class="vehicle-name">${esc(v.name)}</div>
-            <div class="meta"><span>${esc(v.type)}</span><span>${esc(v.rego||"No rego")}</span><span>${esc(v.assignedTo||"Unassigned")}</span></div>
+            <div class="meta"><span>${esc(v.type)}</span><span>${esc(v.rego||"No rego")}</span>${v.assignedTo?`<span>${esc(v.assignedTo)}</span>`:""}</div>
           </div>
-          <span class="pill ${status.level}">${status.label}</span>
+          <span class="pill ${flags.length?"bad":status.level}">${flags.length?flags.length+" flag"+(flags.length===1?"":"s"):status.label}</span>
         </div>
-        <div class="kv">
-          <div><strong>${num(v.currentKm)}</strong><span>km</span></div>
-          <div><strong>${num(v.currentHours)}</strong><span>hours</span></div>
-        </div>
+        ${kv}
         <div class="fine">${esc(worst ? worst.task + ": " + worst.due.details.join(", ") : "Add service tasks")}</div>
         <div class="actions">
           <button class="slim" onclick="selectVehicle('${v.id}')">Open</button>
-          <button class="slim" onclick="openReadingModal('${v.id}')">Readings</button>
+          <button class="slim" onclick="openCheckModal('${v.id}')">Check</button>
           <button class="slim" onclick="openVehicleModal('${v.id}')">Edit</button>
         </div>
       </div>`;
@@ -543,38 +646,47 @@
         <div class="toolbar">
           <h2>Vehicles</h2>
           <div class="actions">
-            <button onclick="openVehicleModal()">Add vehicle</button>
-            <button onclick="openReadingModal('${selected ? selected.id : ""}')">Update readings</button>
+            <button onclick="openVehicleModal()">Add unit</button>
+            <button onclick="openCheckModal('${selected ? selected.id : ""}')">Weekly check</button>
             <button onclick="openPlanModal(null,'${selected ? selected.id : ""}')">Add service task</button>
           </div>
         </div>
         <div class="split">
-          <div class="side">${state.vehicles.map(v=>`<button class="${selected&&selected.id===v.id?"active":""}" onclick="selectVehicle('${v.id}')">${esc(v.name)}<br><span class="fine">${esc(v.type)} ${esc(v.rego||"")}</span></button>`).join("")}</div>
-          <div>${selected ? vehicleDetail(selected) : `<div class="empty">Add a vehicle to start.</div>`}</div>
+          <div class="side">${vehiclesByCategory().map(g=>`<div class="group-head">${g.label}</div>${g.items.map(v=>`<button class="${selected&&selected.id===v.id?"active":""}" onclick="selectVehicle('${v.id}')">${esc(v.name)}<br><span class="fine">${esc(v.type)} ${esc(v.rego||"")}</span></button>`).join("")}`).join("")}</div>
+          <div>${selected ? vehicleDetail(selected) : `<div class="empty">Add a unit to start.</div>`}</div>
         </div>`;
     }
     function vehicleDetail(v){
       const plans = planRows().filter(p=>p.vehicleId===v.id);
       const history = state.history.filter(h=>h.vehicleId===v.id).sort((a,b)=>b.date.localeCompare(a.date)).slice(0,8);
+      const checks = state.checks.filter(c=>c.vehicleId===v.id).sort((a,b)=>String(b.date).localeCompare(String(a.date))).slice(0,4);
+      const cd = checkDue(v);
+      const kv = showsKmHours(v)
+        ? `<div class="kv" style="margin-top:10px"><div><strong>${num(v.currentKm)}</strong><span>km</span></div><div><strong>${num(v.currentHours)}</strong><span>hours</span></div></div>`
+        : "";
       return `<div class="grid">
         <div class="card">
           <div class="vehicle-top">
             <div>
               <h3>${esc(v.name)}</h3>
-              <div class="meta"><span>${esc(v.makeModel)}</span><span>${esc(v.year)}</span><span>${esc(v.location)}</span></div>
+              <div class="meta"><span>${esc(CAT_LABEL[vehCategory(v)]||vehCategory(v))}</span><span>${esc(v.makeModel)}</span><span>${esc(v.year)}</span><span>${esc(v.location)}</span></div>
             </div>
-            <span class="pill">${esc(v.status)}</span>
+            <span class="pill ${vehCategory(v)!=="Implement"?cd.level:""}">${vehCategory(v)!=="Implement"?cd.label:esc(v.status)}</span>
           </div>
-          <div class="kv" style="margin-top:10px">
-            <div><strong>${num(v.currentKm)}</strong><span>km</span></div>
-            <div><strong>${num(v.currentHours)}</strong><span>hours</span></div>
-          </div>
+          ${kv}
           <p class="fine">${esc(v.notes||"")}</p>
           <div class="actions">
-            <button class="slim" onclick="openVehicleModal('${v.id}')">Edit vehicle</button>
-            <button class="slim" onclick="openReadingModal('${v.id}')">Update readings</button>
+            <button class="slim" onclick="openVehicleModal('${v.id}')">Edit unit</button>
+            <button class="slim" onclick="openCheckModal('${v.id}')">Weekly check</button>
             <button class="slim" onclick="openCompleteService(null,'${v.id}')">Complete service</button>
           </div>
+        </div>
+        <div>
+          <div class="toolbar"><h2>Recent checks</h2><div class="actions"><button class="slim" onclick="openCheckModal('${v.id}')">Run check</button></div></div>
+          ${checks.length?`<div class="table-wrap"><table><thead><tr><th>Date</th><th>By</th><th>Result</th></tr></thead><tbody>${checks.map(c=>{
+            const f=(c.items||[]).filter(i=>i.status==="flag").length, w=(c.items||[]).filter(i=>i.status==="watch").length;
+            return `<tr><td>${niceDate(c.date)}</td><td>${esc(c.checkedBy||"")}</td><td>${f?`<span class="pill bad">${f} flag${f===1?"":"s"}</span> `:""}${w?`<span class="pill warn">${w} watch</span> `:""}${(!f&&!w)?`<span class="pill good">All OK</span>`:""}</td></tr>`;
+          }).join("")}</tbody></table></div>`:`<div class="empty">No checks yet.</div>`}
         </div>
         <div>
           <div class="toolbar"><h2>Service plan</h2><div class="actions"><button class="slim" onclick="openPlanModal(null,'${v.id}')">Add task</button></div></div>
@@ -720,6 +832,114 @@
           ${low.length ? `<div class="table-wrap"><table><thead><tr><th>Part</th><th>Supplier</th><th>Location</th><th class="right">Qty</th></tr></thead><tbody>${low.map(p=>`<tr><td>${esc(p.name)}<div class="fine">${esc(p.partNo)}</div></td><td>${esc(p.supplier)}</td><td>${esc(p.location)}</td><td class="right">${num(p.qty)}</td></tr>`).join("")}</tbody></table></div>` : `<div class="empty">No low parts.</div>`}
         </section>`;
     }
+    function renderWeeklyCheck(){
+      const flags = openFlags("flag");
+      const watch = openFlags("watch");
+      const units = state.vehicles.filter(v=>vehCategory(v)!=="Implement" && v.status!=="Sold");
+      const dueUnits = units.filter(v=>checkDue(v).level!=="good");
+      byId("view").innerHTML = `
+        <div class="toolbar">
+          <h2>Weekly Check</h2>
+          <div class="actions">
+            <button onclick="print()">Print for toolbox</button>
+          </div>
+        </div>
+        <p class="fine">Staff: pick a unit, update km/hours, tick each item OK / Watch / Red flag. Red flags come to the toolbox meeting.</p>
+        <section class="grid cols-3">
+          ${metric("Red flags",flags.length,"bad")}
+          ${metric("Watch items",watch.length,"warn")}
+          ${metric("Checks due",dueUnits.length,"warn")}
+        </section>
+        <section style="margin-top:12px">
+          <div class="toolbar"><h2>For the toolbox meeting</h2></div>
+          ${flags.length?`<div class="table-wrap"><table>
+            <thead><tr><th>Unit</th><th>Issue</th><th>Note</th><th>Reported</th><th class="right"></th></tr></thead>
+            <tbody>${flags.map(f=>`<tr>
+              <td><span class="pill bad">Red flag</span> ${esc(vehicleName(f.vehicleId))}</td>
+              <td><strong>${esc(f.label)}</strong></td>
+              <td class="flag-note">${esc(f.note||"-")}</td>
+              <td>${niceDate(f.date)}<div class="fine">${esc(f.checkedBy||"")}</div></td>
+              <td class="right nowrap"><button class="slim" onclick="resolveFlag('${f.checkId}','${f.itemKey}')">Mark done</button></td>
+            </tr>`).join("")}</tbody></table></div>`:`<div class="empty">No red flags. Fleet is running clean.</div>`}
+        </section>
+        ${watch.length?`<section style="margin-top:12px">
+          <div class="toolbar"><h2>Keep an eye on</h2></div>
+          <div class="table-wrap"><table>
+            <thead><tr><th>Unit</th><th>Item</th><th>Note</th><th>Reported</th><th class="right"></th></tr></thead>
+            <tbody>${watch.map(f=>`<tr>
+              <td>${esc(vehicleName(f.vehicleId))}</td>
+              <td>${esc(f.label)}</td>
+              <td>${esc(f.note||"-")}</td>
+              <td>${niceDate(f.date)}<div class="fine">${esc(f.checkedBy||"")}</div></td>
+              <td class="right nowrap"><button class="slim" onclick="resolveFlag('${f.checkId}','${f.itemKey}')">Clear</button></td>
+            </tr>`).join("")}</tbody></table></div>
+        </section>`:""}
+        <section style="margin-top:12px">
+          <div class="toolbar"><h2>Run a check</h2></div>
+          ${vehiclesByCategory().filter(g=>g.cat!=="Implement").map(g=>`<div class="group-head">${g.label}</div>
+            <div class="table-wrap"><table><tbody>${g.items.filter(v=>v.status!=="Sold").map(v=>{
+              const cd=checkDue(v);
+              return `<tr>
+                <td><strong>${esc(v.name)}</strong><div class="fine">${esc(v.type)} ${esc(v.rego||"")}</div></td>
+                <td><span class="pill ${cd.level}">${cd.label}</span></td>
+                <td class="right nowrap"><button class="slim primary" onclick="openCheckModal('${v.id}')">Run check</button></td>
+              </tr>`;
+            }).join("")}</tbody></table></div>`).join("")}
+        </section>`;
+    }
+    function openCheckModal(vehicleId){
+      const v = state.vehicles.find(x=>x.id===vehicleId) || selectedVehicle() || state.vehicles[0];
+      if(!v) return;
+      const cat = vehCategory(v);
+      const items = checkItemsFor(cat);
+      const by = state.settings.lastStaff || (state.settings.staff||DEFAULT_STAFF)[0] || "";
+      const kmHours = showsKmHours(v)
+        ? `<label>Current km<input id="ck-km" type="number" value="${Number(v.currentKm||0)}"></label>
+           <label>Current hours<input id="ck-hours" type="number" value="${Number(v.currentHours||0)}"></label>`
+        : "";
+      openModal("Weekly check — "+v.name,`
+        <div class="form-grid">
+          <label>Unit<select id="ck-vehicle" onchange="openCheckModal(this.value)">${vehicleOptions(v.id)}</select></label>
+          <label>Date<input id="ck-date" type="date" value="${todayISO()}"></label>
+          <label>Checked by<select id="ck-by">${staffOptions(by)}</select></label>
+          ${kmHours}
+        </div>
+        <div>${items.map(it=>`<div class="check-item">
+          <div class="ci-label">${esc(it.label)}</div>
+          <select id="ck-st-${it.key}" data-flag="ok" onchange="this.dataset.flag=this.value">
+            <option value="ok">OK</option>
+            <option value="watch">Watch</option>
+            <option value="flag">Red flag</option>
+          </select>
+          <input class="ci-note" id="ck-nt-${it.key}" placeholder="Note if not OK">
+        </div>`).join("")}</div>
+        <label>General notes<textarea id="ck-note" placeholder="Anything else to raise"></textarea></label>`,
+        "Save check",
+        ()=>mutate(()=>{
+          const target = state.vehicles.find(x=>x.id===formVal("ck-vehicle")) || v;
+          if(showsKmHours(target)){
+            target.currentKm = formNum("ck-km");
+            target.currentHours = formNum("ck-hours");
+          }
+          target.updatedAt = stampNow();
+          const chkItems = checkItemsFor(vehCategory(target)).map(it=>({
+            key:it.key,label:it.label,status:formVal("ck-st-"+it.key)||"ok",note:formVal("ck-nt-"+it.key),resolved:false
+          }));
+          const by2 = formVal("ck-by");
+          state.settings.lastStaff = by2;
+          state.checks.push({id:idNew("chk"),vehicleId:target.id,date:formVal("ck-date")||todayISO(),checkedBy:by2,km:Number(target.currentKm||0),hours:Number(target.currentHours||0),items:chkItems,note:formVal("ck-note"),updatedAt:stampNow()});
+          state.selectedVehicleId = target.id;
+          closeModal();
+        },"Check saved")
+      );
+      // colour any pre-set selects (none by default, but keeps behaviour consistent)
+    }
+    function resolveFlag(checkId,itemKey){
+      mutate(()=>{
+        const c = state.checks.find(x=>x.id===checkId);
+        if(c){ const it=(c.items||[]).find(i=>i.key===itemKey); if(it){ it.resolved=true; } c.updatedAt=stampNow(); }
+      },"Cleared");
+    }
     function openModal(title, body, saveLabel, onSave, extraButtons){
       modalSave = onSave;
       byId("modal-title").textContent = title;
@@ -737,11 +957,13 @@
       return state.vehicles.map(v=>`<option value="${v.id}" ${selected===v.id?"selected":""}>${esc(v.name)}</option>`).join("");
     }
     function openVehicleModal(id){
-      const v = state.vehicles.find(x=>x.id===id) || {id:null,name:"",rego:"",type:"Ute",makeModel:"",year:"",assignedTo:"Aaron",location:"",currentKm:0,currentHours:0,status:"Active",notes:""};
-      openModal(id?"Edit vehicle":"Add vehicle",`
+      const v = state.vehicles.find(x=>x.id===id) || {id:null,name:"",category:"Vehicle",rego:"",type:"Ute",makeModel:"",year:"",assignedTo:"",location:"Peel Forest",currentKm:0,currentHours:0,status:"Active",notes:""};
+      const cat = vehCategory(v);
+      openModal(id?"Edit unit":"Add unit",`
         <div class="form-grid">
           <label>Name<input id="v-name" value="${esc(v.name)}"></label>
-          <label>Type<input id="v-type" value="${esc(v.type)}"></label>
+          <label>Category<select id="v-category">${CAT_ORDER.map(c=>`<option value="${c}" ${cat===c?"selected":""}>${CAT_LABEL[c]}</option>`).join("")}</select></label>
+          <label>Type<input id="v-type" value="${esc(v.type)}" placeholder="Ute, Tractor, Loader, Trailer…"></label>
           <label>Rego<input id="v-rego" value="${esc(v.rego)}"></label>
           <label>Make / model<input id="v-model" value="${esc(v.makeModel)}"></label>
           <label>Year<input id="v-year" value="${esc(v.year)}"></label>
@@ -754,11 +976,11 @@
         </div>`,
         "Save vehicle",
         ()=>mutate(()=>{
-          const next = {id:id||idNew("veh"),name:formVal("v-name")||"Unnamed vehicle",type:formVal("v-type"),rego:formVal("v-rego"),makeModel:formVal("v-model"),year:formVal("v-year"),assignedTo:formVal("v-assigned"),location:formVal("v-location"),status:formVal("v-status"),currentKm:formNum("v-km"),currentHours:formNum("v-hours"),notes:formVal("v-notes"),updatedAt:stampNow()};
+          const next = {id:id||idNew("veh"),name:formVal("v-name")||"Unnamed unit",category:formVal("v-category")||"Vehicle",type:formVal("v-type"),rego:formVal("v-rego"),makeModel:formVal("v-model"),year:formVal("v-year"),assignedTo:formVal("v-assigned"),location:formVal("v-location"),status:formVal("v-status"),currentKm:formNum("v-km"),currentHours:formNum("v-hours"),notes:formVal("v-notes"),updatedAt:stampNow()};
           if(id) state.vehicles = state.vehicles.map(x=>x.id===id?next:x); else state.vehicles.push(next);
           state.selectedVehicleId = next.id;
           closeModal();
-        }, id?"Vehicle updated":"Vehicle added")
+        }, id?"Unit updated":"Unit added")
       );
     }
     function idNew(prefix){return prefix + "-" + Date.now().toString(36)}
@@ -782,7 +1004,7 @@
             target.updatedAt = stampNow();
             const note = formVal("r-note");
             if(note){
-              state.history.push({id:idNew("hist"),vehicleId:target.id,date:formVal("r-date")||todayISO(),task:"Reading update",km:target.currentKm,hours:target.currentHours,parts:"",cost:0,performedBy:"Aaron",notes:note,updatedAt:stampNow()});
+              state.history.push({id:idNew("hist"),vehicleId:target.id,date:formVal("r-date")||todayISO(),task:"Reading update",km:target.currentKm,hours:target.currentHours,parts:"",cost:0,performedBy:state.settings.lastStaff||"",notes:note,updatedAt:stampNow()});
             }
             state.selectedVehicleId = target.id;
           }
@@ -841,7 +1063,7 @@
           <label class="full">Planned task<select id="c-plan"><option value="">Manual service entry</option>${taskOptions}</select></label>
           <label>Km<input id="c-km" type="number" value="${Number(v.currentKm||0)}"></label>
           <label>Hours<input id="c-hours" type="number" value="${Number(v.currentHours||0)}"></label>
-          <label>Performed by<input id="c-by" value="Aaron"></label>
+          <label>Performed by<select id="c-by">${staffOptions(state.settings.lastStaff)}</select></label>
           <label>Cost (ex GST)<input id="c-cost" type="number" value="0"></label>
           <label class="full">Work completed<input id="c-task" value="${esc(plan ? plan.task : "")}"></label>
           <label class="full">Parts used<input id="c-parts" value="${esc(plan ? plan.parts : "")}"></label>
@@ -876,7 +1098,7 @@
       byId("c-plan").innerHTML = `<option value="">Manual service entry</option>` + state.plans.filter(p=>p.vehicleId===v.id).map(p=>`<option value="${p.id}">${esc(p.task)}</option>`).join("");
     }
     function openHistoryModal(id,vehicleId){
-      const h = state.history.find(x=>x.id===id) || {id:null,vehicleId:vehicleId||state.selectedVehicleId||state.vehicles[0]?.id,date:todayISO(),task:"",km:0,hours:0,parts:"",cost:0,performedBy:"Aaron",notes:""};
+      const h = state.history.find(x=>x.id===id) || {id:null,vehicleId:vehicleId||state.selectedVehicleId||state.vehicles[0]?.id,date:todayISO(),task:"",km:0,hours:0,parts:"",cost:0,performedBy:state.settings.lastStaff||"",notes:""};
       openModal(id?"Edit history":"Add history",`
         <div class="form-grid">
           <label>Vehicle<select id="h-vehicle">${vehicleOptions(h.vehicleId)}</select></label>
@@ -884,7 +1106,7 @@
           <label class="full">Work<input id="h-task" value="${esc(h.task)}"></label>
           <label>Km<input id="h-km" type="number" value="${Number(h.km||0)}"></label>
           <label>Hours<input id="h-hours" type="number" value="${Number(h.hours||0)}"></label>
-          <label>Performed by<input id="h-by" value="${esc(h.performedBy)}"></label>
+          <label>Performed by<select id="h-by">${staffOptions(h.performedBy||state.settings.lastStaff)}</select></label>
           <label>Cost (ex GST)<input id="h-cost" type="number" value="${Number(h.cost||0)}"></label>
           <label class="full">Parts<input id="h-parts" value="${esc(h.parts)}"></label>
           <label class="full">Notes<textarea id="h-notes">${esc(h.notes)}</textarea></label>

@@ -24,11 +24,12 @@ const HEADERS = {
   Vehicles: ["id","name","rego","type","makeModel","year","assignedTo","location","currentKm","currentHours","status","notes","updatedAt"],
   Plans:    ["id","vehicleId","task","priority","everyKm","everyHours","everyMonths","lastKm","lastHours","lastDate","parts","estHours","supplier","notes","updatedAt"],
   History:  ["id","vehicleId","date","task","km","hours","parts","cost","performedBy","notes","updatedAt"],
-  Parts:    ["id","name","partNo","supplier","qty","reorder","unitCost","location","vehicleIds","notes","updatedAt"]
+  Parts:    ["id","name","partNo","supplier","qty","reorder","unitCost","location","vehicleIds","notes","updatedAt"],
+  Checks:   ["id","vehicleId","date","checkedBy","km","hours","items","note","updatedAt"]  // items = JSON string
 };
 
 // payload key (lowercase) -> sheet tab name
-const TAB = { vehicles:"Vehicles", plans:"Plans", history:"History", parts:"Parts" };
+const TAB = { vehicles:"Vehicles", plans:"Plans", history:"History", parts:"Parts", checks:"Checks" };
 const NUMERIC_SETTINGS = ["soonKm","soonHours","soonDays"];
 
 function ss_() {
@@ -117,6 +118,7 @@ function snapshot_(ss) {
     plans: readObjects_(ss, "Plans"),
     history: readObjects_(ss, "History"),
     parts: readObjects_(ss, "Parts"),
+    checks: readObjects_(ss, "Checks"),
     settings: meta,
     lastModified: lastModified
   };
