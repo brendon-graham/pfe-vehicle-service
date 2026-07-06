@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="app-version" content="v1.3.1">
+  <meta name="app-version" content="v1.3.2">
   <title>PFE Vehicle Service</title>
   <style>
     :root{
@@ -151,7 +151,7 @@
           </div>
         </div>
         <div class="head-actions">
-          <span class="pill" id="version-pill">v1.3.1</span>
+          <span class="pill" id="version-pill">v1.3.2</span>
           <button class="primary" onclick="openCompleteService()">Complete service</button>
           <button onclick="openVehicleModal()">Add vehicle</button>
         </div>
@@ -181,12 +181,12 @@
   <input type="file" id="restore-file" accept="application/json" hidden>
 
   <script>
-    const VERSION = "v1.3.1";
-    // (activation-safety fixes: empty-sheet seed guard + staff array coercion)
+    const VERSION = "v1.3.2";
+    // Sheets sync LIVE from v1.3.2 (SCRIPT_URL set). Empty-sheet seed guard + staff coercion from v1.3.1.
     const STORAGE_KEY = "pfe_vehicle_service_v1";
     // Google Sheets sync. Paste the Apps Script Web App URL to turn sync ON.
     // Empty string = sync OFF, localStorage only (safe default — nothing leaves the device).
-    const SCRIPT_URL = "";
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwpJtHt6GLziydjUR1mCGNG6ExJaPVJn9p48dI7ebOt34weBwnQHpc6YPZ-pw9lXo3Q/exec";
     const LASTMOD_KEY = STORAGE_KEY + "_lastmod";
     let syncPending = false;   // a local edit is waiting to be pushed
     let isPushing = false;     // a push is in flight
