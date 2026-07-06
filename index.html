@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="app-version" content="v1.3.0">
+  <meta name="app-version" content="v1.3.1">
   <title>PFE Vehicle Service</title>
   <style>
     :root{
@@ -151,7 +151,7 @@
           </div>
         </div>
         <div class="head-actions">
-          <span class="pill" id="version-pill">v1.3.0</span>
+          <span class="pill" id="version-pill">v1.3.1</span>
           <button class="primary" onclick="openCompleteService()">Complete service</button>
           <button onclick="openVehicleModal()">Add vehicle</button>
         </div>
@@ -181,7 +181,8 @@
   <input type="file" id="restore-file" accept="application/json" hidden>
 
   <script>
-    const VERSION = "v1.3.0";
+    const VERSION = "v1.3.1";
+    // (activation-safety fixes: empty-sheet seed guard + staff array coercion)
     const STORAGE_KEY = "pfe_vehicle_service_v1";
     // Google Sheets sync. Paste the Apps Script Web App URL to turn sync ON.
     // Empty string = sync OFF, localStorage only (safe default — nothing leaves the device).
@@ -336,7 +337,12 @@
       if(Array.isArray(srv.history)) state.history = srv.history;
       if(Array.isArray(srv.parts)) state.parts = srv.parts.map(p=>({...p,vehicleIds:typeof p.vehicleIds==="string"?p.vehicleIds.split("|").filter(Boolean):(p.vehicleIds||[])}));
       if(Array.isArray(srv.checks)) state.checks = srv.checks.map(c=>({...c,items:typeof c.items==="string"?(()=>{try{return JSON.parse(c.items)}catch(e){return []}})():(c.items||[])}));
-      if(srv.settings) state.settings = {...state.settings, ...srv.settings};
+      if(srv.settings){
+        state.settings = {...state.settings, ...srv.settings};
+        // Meta stores the staff array as a comma-joined cell — split it back to an array.
+        if(typeof state.settings.staff === "string") state.settings.staff = state.settings.staff.split(",").map(s=>s.trim()).filter(Boolean);
+        if(!Array.isArray(state.settings.staff) || !state.settings.staff.length) state.settings.staff = DEFAULT_STAFF.slice();
+      }
       saveLocal();
       render();
     }
@@ -376,6 +382,10 @@
         const res = await fetch(SCRIPT_URL);
         const data = await res.json();
         if(data && data.lastModified !== undefined){
+          const serverEmpty = !(data.vehicles&&data.vehicles.length) && !(data.plans&&data.plans.length) && !(data.history&&data.history.length) && !(data.parts&&data.parts.length) && !(data.checks&&data.checks.length);
+          const localHasData = (state.vehicles&&state.vehicles.length) || (state.plans&&state.plans.length) || (state.history&&state.history.length) || (state.parts&&state.parts.length) || (state.checks&&state.checks.length);
+          // First activation / empty sheet: seed the sheet from this device instead of wiping local data.
+          if(serverEmpty && localHasData){ schedulePush(); return; }
           applyServer(data);
           localStorage.setItem(LASTMOD_KEY, data.lastModified||"");
         }
