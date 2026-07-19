@@ -1,33 +1,42 @@
 # PFE Vehicle Service
 
-Vehicle and equipment service tracker for Peel Forest Estate. Single-file PWA — `index.html` holds all HTML, CSS, and JavaScript. No build step.
+Vehicle and equipment service tracker for Peel Forest Estate. Single-file PWA:
+`index.html` holds all HTML, CSS, and JavaScript. No build step.
 
 - **Live:** https://brendon-graham.github.io/pfe-vehicle-service/
-- **Users:** Aaron (update readings, complete services, add parts, note defects) and Brendon (review overdue/upcoming work, costs, history, export reports).
-- **Version:** v1.2.0
+- **Users:** Aaron and staff update readings, complete services, run weekly checks, add parts, and note defects. Brendon reviews overdue/upcoming work, red flags, costs, history, and export reports.
+- **Version:** v1.3.3
 
 ## Data
 
-- Primary store: browser `localStorage` under key `pfe_vehicle_service_v1`.
-- Optional Google Sheets sync via an Apps Script Web App (`Code.gs`). **Off by default** — sync only runs once `SCRIPT_URL` in `index.html` is set to a deployed Web App URL. Empty `SCRIPT_URL` = localStorage only, nothing leaves the device.
+- Source of truth: the shared Google Sheet, synced through the Apps Script Web App in `Code.gs`.
+- Offline cache: browser `localStorage` under key `pfe_vehicle_service_v1`.
+- Sync is live in `index.html` via `SCRIPT_URL`. Do not point test builds at the live endpoint unless the test is meant to write to the real fleet record.
 
-## Sheets sync — how to turn it on
+Sync design: header-mapped read/write, row-level merge by `updatedAt`, explicit
+deletes, response-checked push, 30s poll, pulls-never-push, empty-sheet seed
+guard, and staff-array coercion.
 
-1. Create a Google Sheet (the workbook). Extensions → Apps Script.
-2. Paste `Code.gs` into the script editor. Save.
-3. Deploy → New deployment → Web app → Execute as **Me** → Who has access **Anyone** → Deploy. Copy the Web app URL.
-4. Paste that URL into `const SCRIPT_URL = ""` in `index.html`, commit, and push.
-5. First load builds the tabs (Vehicles, Plans, History, Parts, Meta) and seeds them from the current data.
+## Current Features
 
-Sync design: header-mapped read/write, row-level merge by `updatedAt` (two writers editing different rows both survive), explicit deletes, response-checked push, 30s poll, pulls-never-push.
+- 18-unit PFE fleet: vehicles, trailers, tractors, and loaders.
+- Category grouping: Vehicle / Trailer / Implement.
+- Weekly Check tab with staff-stamped OK / Watch / Red flag checks.
+- Dashboard and Weekly Check toolbox lists for unresolved red flags.
+- Service plan, service history, parts stock, reorder warnings, JSON backup/restore, CSV export, and print review.
+- 24MY Isuzu D-Max schedule loaded for D-Max utes, with manual/model confirmation notes.
 
-## Deploy (GitHub Pages)
+## Deploy
 
-Settings → Pages → Deploy from a branch → `main` → `/ (root)`.
+- GitHub Pages serves the `main` branch from the repository root.
+- After app changes, commit and push to `origin/main`.
+- Save reference snapshots and full version notes in the AI Brain project folder:
+  `ai-brain/layer-4-projects/vehicle-service-app/`.
 
-## Notes
+## Open Items
 
-- Fleet loaded (v1.2.0): 18 vehicles — 6 utes, 7 trailers, 5 tractors/loaders. The 4 EROAD D-Maxes (KBW797, LAF516, QLS732, QLS733) keep their imported odometer readings.
-- Still to confirm/add: engine hours on tractors/loaders, odometers on the Navara + JSG473, WOF/rego/service intervals, and 5 trailer regos.
-- Do not connect sync on a device holding seed data — clear it first.
-- Project docs, design specs, and version snapshots live in the AI Brain: `ai-brain/layer-4-projects/vehicle-service-app/`.
+- Enter/confirm last done km/date for D-Max service-plan rows.
+- Confirm WOF, rego, and service intervals for non-D-Max units.
+- Confirm engine hours on tractors/loaders and odometers on the Navara and Helen's D-Max.
+- Confirm regos for the five trailers marked unknown and the Manitou plate/model.
+- Redeploy the Apps Script after `Code.gs` changes so the live sheet endpoint uses the latest headers.

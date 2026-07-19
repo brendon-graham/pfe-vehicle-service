@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="app-version" content="v1.3.2">
+  <meta name="app-version" content="v1.3.3">
   <title>PFE Vehicle Service</title>
   <style>
     :root{
@@ -151,7 +151,7 @@
           </div>
         </div>
         <div class="head-actions">
-          <span class="pill" id="version-pill">v1.3.2</span>
+          <span class="pill" id="version-pill">v1.3.3</span>
           <button class="primary" onclick="openCompleteService()">Complete service</button>
           <button onclick="openVehicleModal()">Add vehicle</button>
         </div>
@@ -181,7 +181,7 @@
   <input type="file" id="restore-file" accept="application/json" hidden>
 
   <script>
-    const VERSION = "v1.3.2";
+    const VERSION = "v1.3.3";
     // Sheets sync LIVE from v1.3.2 (SCRIPT_URL set). Empty-sheet seed guard + staff coercion from v1.3.1.
     const STORAGE_KEY = "pfe_vehicle_service_v1";
     // Google Sheets sync. Paste the Apps Script Web App URL to turn sync ON.
@@ -202,13 +202,13 @@
     const DEFAULT_STAFF = ["Aaron Jarrett","Henry Wilson","Anuar Jalil","Hayden Coe","Jack Goodwin","Dylan Miller","Doug Hopkirk","Brendon Graham"];
     const CHECK_DUE_DAYS = 7;
     const VEHICLE_CHECK = [
-      {key:"fluids",label:"Fluids (oil, coolant, water)"},
-      {key:"tyres",label:"Tyres & wheels"},
-      {key:"lights",label:"Lights & indicators"},
+      {key:"fluids",label:"Fluids (oil, coolant, brake, washer)"},
+      {key:"tyres",label:"Tyres, spare & wheels"},
+      {key:"lights",label:"Lights, wipers & indicators"},
       {key:"leaks",label:"Leaks (oil, hydraulic, fuel)"},
-      {key:"brakes",label:"Brakes & steering"},
+      {key:"brakes",label:"Brakes, park brake & steering"},
       {key:"damage",label:"Damage, glass, mirrors"},
-      {key:"dash",label:"Dash warning lights"},
+      {key:"dash",label:"Dash warning lights, noise, smoke"},
       {key:"clean",label:"Clean, no loose gear"}
     ];
     const TRAILER_CHECK = [
@@ -227,6 +227,166 @@
       {key:"wear",label:"Tines / blades / wear parts"},
       {key:"bolts",label:"Bolts & pins tight"},
       {key:"damage",label:"Damage"}
+    ];
+    const DMAX_SCHEDULE_VERSION = "2026-07-08-dmax-24my-v1";
+    const DMAX_MANUAL_NOTE = "24MY Isuzu D-Max manual schedule loaded 8 Jul 2026. Manual table is for TFR/S 87 (RZ4E-TCX); confirm exact NZ model/year with Isuzu before relying on warranty-critical intervals, especially older D-Max utes.";
+    const DMAX_PLAN_TEMPLATES = [
+      {
+        key:"severe-oil",
+        task:"D-Max farm severe oil change",
+        priority:"High",
+        everyKm:5000,
+        everyMonths:6,
+        parts:"Low-ash engine oil 6.6 L plus drain washer",
+        estHours:1,
+        supplier:"Isuzu or oil supplier",
+        notes:"Tick list: complete weekly check; drain and replace engine oil; check oil level after refill/run; check for leaks; record km and oil used. Severe-service rule from the 24MY manual for dusty, towing, low-speed or DPD-interruption use. " + DMAX_MANUAL_NOTE
+      },
+      {
+        key:"oil-filter",
+        task:"D-Max oil filter service",
+        priority:"High",
+        everyKm:10000,
+        everyMonths:12,
+        parts:"Low-ash engine oil; engine oil filter element; O-ring/gasket; drain washer",
+        estHours:1.3,
+        supplier:"Isuzu",
+        notes:"Tick list: replace engine oil; replace oil filter element and O-ring/gasket; check oil level after refill/run; check for leaks; reset maintenance reminder if required; record km, parts and notes. " + DMAX_MANUAL_NOTE
+      },
+      {
+        key:"air-cleaner-check",
+        task:"D-Max air cleaner inspect/clean",
+        priority:"Normal",
+        everyKm:5000,
+        everyMonths:6,
+        parts:"Air cleaner element if dirty",
+        estHours:0.4,
+        supplier:"Isuzu",
+        notes:"Tick list: inspect air cleaner element; replace if dirty or damaged; note dusty-road condition in history. Manual severe dusty-road rule: inspect every 5,000 km. " + DMAX_MANUAL_NOTE
+      },
+      {
+        key:"air-cleaner-replace",
+        task:"D-Max air cleaner replace",
+        priority:"Normal",
+        everyKm:20000,
+        everyMonths:24,
+        parts:"Air cleaner element",
+        estHours:0.4,
+        supplier:"Isuzu",
+        notes:"Tick list: replace air cleaner element; check airbox sealing and dust entry; record part used. Manual normal replacement is 40,000 km/48 months; dusty severe replacement is 20,000 km. " + DMAX_MANUAL_NOTE
+      },
+      {
+        key:"full-inspection",
+        task:"D-Max full scheduled inspection",
+        priority:"High",
+        everyKm:20000,
+        everyMonths:24,
+        parts:"Grease; workshop consumables; fuel filter spare if none on shelf",
+        estHours:2,
+        supplier:"Aaron/workshop",
+        notes:"Tick list: belts; hoses; oil/coolant/fuel/brake leaks; exhaust; steering; brakes; suspension; tyres and spare; lights; wheel nuts; chassis/body bolts; fuel tank/hoses; coolant concentration. Fuel filter and water separator are warning-light jobs unless Isuzu says otherwise. " + DMAX_MANUAL_NOTE
+      },
+      {
+        key:"prop-shaft-grease",
+        task:"D-Max prop shaft grease/check",
+        priority:"Normal",
+        everyKm:5000,
+        everyMonths:6,
+        parts:"NLGI #2 moly multi-purpose grease",
+        estHours:0.4,
+        supplier:"Aaron/workshop",
+        notes:"Tick list: inspect universal joints and sleeves; lubricate propeller shaft universal joints/sliding sleeve where fitted; check for wear/noise. Severe rough/dusty rule from the manual. " + DMAX_MANUAL_NOTE
+      },
+      {
+        key:"brake-wear-check",
+        task:"D-Max front/rear brake wear inspection",
+        priority:"High",
+        everyKm:5000,
+        everyMonths:6,
+        parts:"None unless worn",
+        estHours:0.5,
+        supplier:"Aaron/workshop",
+        notes:"Tick list: inspect front disc pads and discs; inspect rear brake lining and drum wear; check pedal feel and parking brake. Severe short-trip/rough/dusty rule from the manual. " + DMAX_MANUAL_NOTE
+      },
+      {
+        key:"diff-oil",
+        task:"D-Max front/rear differential oil replace",
+        priority:"Normal",
+        everyKm:20000,
+        everyMonths:24,
+        parts:"GL-5 or GL-5/MT-1 diff oil; approx 4 L for front plus rear on 4WD",
+        estHours:1.2,
+        supplier:"Workshop/Isuzu",
+        notes:"Tick list: confirm 4WD and diff-lock spec; replace front and rear diff oil if severe rough-road schedule applies; check plugs, washers and leaks. Normal schedule is initial 20,000 km then every 40,000 km; rough-road severe is initial 10,000 km then every 20,000 km. " + DMAX_MANUAL_NOTE
+      },
+      {
+        key:"brake-fluid",
+        task:"D-Max brake/clutch fluid replace",
+        priority:"High",
+        everyKm:40000,
+        everyMonths:48,
+        parts:"DOT 3 or DOT 4 brake/clutch fluid",
+        estHours:1,
+        supplier:"Workshop/Isuzu",
+        notes:"Tick list: replace brake/clutch fluid; check brake hoses, pipes and leaks; road-test brake feel safely; record fluid used. " + DMAX_MANUAL_NOTE
+      },
+      {
+        key:"cabin-filter",
+        task:"D-Max cabin filter replace",
+        priority:"Low",
+        everyKm:60000,
+        everyMonths:24,
+        parts:"Cabin/air-conditioning filter",
+        estHours:0.3,
+        supplier:"Isuzu",
+        notes:"Tick list: replace air-conditioning/cabin filter; check airflow and note dust load. " + DMAX_MANUAL_NOTE
+      },
+      {
+        key:"atf-inspect",
+        task:"D-Max automatic transmission fluid inspect",
+        priority:"Normal",
+        everyKm:40000,
+        everyMonths:24,
+        parts:"None unless fluid issue found",
+        estHours:0.5,
+        supplier:"Workshop/Isuzu",
+        notes:"Tick list: inspect automatic transmission fluid and leaks. Severe-use inspection interval for rough-road/towing/short-trip/cold-salted conditions; normal inspection is 120,000 km/72 months. " + DMAX_MANUAL_NOTE
+      },
+      {
+        key:"atf-replace",
+        task:"D-Max automatic transmission fluid replace",
+        priority:"Normal",
+        everyKm:80000,
+        everyMonths:72,
+        parts:"ISUZU ATF WSI; confirm service kit by VIN",
+        estHours:2,
+        supplier:"Workshop/Isuzu",
+        notes:"Tick list: replace ATF only with correct Isuzu fluid and method; confirm gaskets/seals/service kit by VIN; record quantity and km. Treat as dealer/workshop job unless procedure is confirmed. " + DMAX_MANUAL_NOTE
+      },
+      {
+        key:"coolant",
+        task:"D-Max engine/intercooler coolant replace",
+        priority:"Normal",
+        everyKm:160000,
+        everyMonths:96,
+        parts:"OAT extended-life coolant meeting Isuzu standard; prefer 50/50 pre-diluted",
+        estHours:2,
+        supplier:"Workshop/Isuzu",
+        notes:"Tick list: replace engine and intercooler coolant when due; pressure/leak check cooling system; record coolant type and quantity. Manual interval assumes Isuzu genuine coolant; confirm shorter interval if another approved coolant is used. " + DMAX_MANUAL_NOTE
+      }
+    ];
+    const DMAX_PART_TEMPLATES = [
+      {key:"oil",name:"D-Max low-ash engine oil",supplier:"Isuzu or oil supplier",reorder:1,location:"Workshop",notes:"Keep enough for one oil/filter service. Manual capacity is 6.6 L when changing oil and filter; order at least 7 L per ute or use 10 L packs. Low-ash diesel engine oil suitable for DPD; confirm exact grade with Isuzu."},
+      {key:"oil-filter",name:"D-Max engine oil filter element",supplier:"Isuzu",reorder:2,location:"Workshop",notes:"Order by rego/VIN. Used every oil-filter service."},
+      {key:"drain-washer",name:"D-Max sump plug/drain washer",supplier:"Isuzu",reorder:5,location:"Workshop",notes:"Order by rego/VIN. Keep with oil-filter stock."},
+      {key:"air-cleaner",name:"D-Max air cleaner element",supplier:"Isuzu",reorder:1,location:"Workshop",notes:"For dusty-road severe service; inspect every 5,000 km and replace if dirty/damaged."},
+      {key:"cabin-filter",name:"D-Max cabin/air-conditioning filter",supplier:"Isuzu",reorder:1,location:"Workshop",notes:"Manual interval 60,000 km or 24 months."},
+      {key:"brake-fluid",name:"D-Max DOT 3/DOT 4 brake fluid",supplier:"Isuzu or parts supplier",reorder:1,location:"Workshop",notes:"For brake/clutch fluid replacement. Confirm DOT 3 or DOT 4 product before use."},
+      {key:"fuel-filter",name:"D-Max fuel filter spare",supplier:"Isuzu",reorder:1,location:"Workshop",notes:"Manual says replace fuel filter when the warning light comes on; hold a spare so Aaron is not stuck waiting."},
+      {key:"moly-grease",name:"D-Max NLGI #2 moly grease",supplier:"Workshop supplier",reorder:1,location:"Workshop",notes:"For propeller shaft sliding yoke/universal joint lubrication where fitted."},
+      {key:"diff-oil",name:"D-Max GL-5 differential oil",supplier:"Isuzu or oil supplier",reorder:1,location:"Workshop",notes:"For front/rear differential service. Manual examples include GL-5/GL-5 MT-1 and 75W-90/80W-90 depending on axle/spec; confirm exact oil with Isuzu."},
+      {key:"atf",name:"D-Max ISUZU ATF WSI",supplier:"Isuzu",reorder:1,location:"Order when due",notes:"For automatic transmission service. Dealer/workshop job unless correct procedure and quantity are confirmed."},
+      {key:"coolant",name:"D-Max OAT extended-life coolant",supplier:"Isuzu or coolant supplier",reorder:1,location:"Order when due",notes:"Use coolant meeting the Isuzu standard. Manual recommends 50/50 pre-diluted product."}
     ];
     const seedState = {
       activeTab:"Dashboard",
@@ -294,6 +454,78 @@
       if(onlyEroad && seedHistoryOnly) return true;
       return false;
     }
+    function isDmaxVehicle(v){
+      const text = [v?.name,v?.makeModel,v?.type].join(" ").toLowerCase();
+      return text.includes("isuzu") && text.includes("d-max");
+    }
+    function dmaxPlanId(vehicleId,key){
+      return "plan-dmax-" + String(vehicleId).replace(/^veh-/,"") + "-" + key;
+    }
+    function dmaxPartId(key){
+      return "part-dmax-" + key;
+    }
+    function ensureDmaxServiceSchedule(){
+      if(!state || !Array.isArray(state.vehicles)) return false;
+      state.plans = Array.isArray(state.plans) ? state.plans : [];
+      state.parts = Array.isArray(state.parts) ? state.parts : [];
+      state.settings = {...structuredClone(seedState.settings),...(state.settings||{})};
+      if(state.settings.dmaxScheduleVersion === DMAX_SCHEDULE_VERSION) return false;
+      const dmaxVehicles = state.vehicles.filter(isDmaxVehicle);
+      if(!dmaxVehicles.length) return false;
+      const now = stampNow();
+      let changed = false;
+      const existingPlanIds = new Set(state.plans.map(p=>p.id));
+      dmaxVehicles.forEach(v=>{
+        DMAX_PLAN_TEMPLATES.forEach(t=>{
+          const planId = dmaxPlanId(v.id,t.key);
+          if(existingPlanIds.has(planId)) return;
+          state.plans.push({
+            id:planId,
+            vehicleId:v.id,
+            task:t.task,
+            priority:t.priority,
+            everyKm:t.everyKm||0,
+            everyHours:0,
+            everyMonths:t.everyMonths||0,
+            lastKm:0,
+            lastHours:0,
+            lastDate:"",
+            parts:t.parts,
+            estHours:t.estHours||0,
+            supplier:t.supplier,
+            notes:t.notes,
+            updatedAt:now
+          });
+          existingPlanIds.add(planId);
+          changed = true;
+        });
+      });
+      const dmaxVehicleIds = dmaxVehicles.map(v=>v.id);
+      const existingPartIds = new Set(state.parts.map(p=>p.id));
+      DMAX_PART_TEMPLATES.forEach(t=>{
+        const partId = dmaxPartId(t.key);
+        if(existingPartIds.has(partId)) return;
+        state.parts.push({
+          id:partId,
+          name:t.name,
+          partNo:"",
+          supplier:t.supplier,
+          qty:0,
+          reorder:t.reorder,
+          unitCost:0,
+          location:t.location,
+          vehicleIds:dmaxVehicleIds,
+          notes:t.notes,
+          updatedAt:now
+        });
+        existingPartIds.add(partId);
+        changed = true;
+      });
+      state.settings.dmaxScheduleVersion = DMAX_SCHEDULE_VERSION;
+      state.settings.dmaxScheduleAppliedAt = now;
+      changed = true;
+      return changed;
+    }
     function saveLocal(){
       state.updatedAt = new Date().toISOString();
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
@@ -343,8 +575,10 @@
         if(typeof state.settings.staff === "string") state.settings.staff = state.settings.staff.split(",").map(s=>s.trim()).filter(Boolean);
         if(!Array.isArray(state.settings.staff) || !state.settings.staff.length) state.settings.staff = DEFAULT_STAFF.slice();
       }
+      const migrated = ensureDmaxServiceSchedule();
       saveLocal();
       render();
+      return migrated;
     }
     function schedulePush(){
       if(!SCRIPT_URL) return;
@@ -364,7 +598,7 @@
           localStorage.setItem(LASTMOD_KEY, data.lastModified||"");
           pendingDeletes = {vehicles:[],plans:[],history:[],parts:[],checks:[]};
           syncPending = false;
-          if(data.data) applyServer(data.data);
+          if(data.data && applyServer(data.data)) pushAgain = true;
         }else{
           renderSaveStatus("Sync error — saved locally");
         }
@@ -386,8 +620,8 @@
           const localHasData = (state.vehicles&&state.vehicles.length) || (state.plans&&state.plans.length) || (state.history&&state.history.length) || (state.parts&&state.parts.length) || (state.checks&&state.checks.length);
           // First activation / empty sheet: seed the sheet from this device instead of wiping local data.
           if(serverEmpty && localHasData){ schedulePush(); return; }
-          applyServer(data);
           localStorage.setItem(LASTMOD_KEY, data.lastModified||"");
+          if(applyServer(data)) schedulePush();
         }
       }catch(e){}
     }
@@ -400,8 +634,8 @@
         const data = await res.json();
         if(isPushing || syncPending) return;
         if(data && data.lastModified && data.lastModified !== (localStorage.getItem(LASTMOD_KEY)||"")){
-          applyServer(data);
           localStorage.setItem(LASTMOD_KEY, data.lastModified||"");
+          if(applyServer(data)) schedulePush();
         }
       }catch(e){}
     }
@@ -1070,7 +1304,8 @@
         <div class="form-grid">
           <label>Vehicle<select id="c-vehicle" onchange="refreshCompleteTasks(this.value)">${vehicleOptions(v.id)}</select></label>
           <label>Date<input id="c-date" type="date" value="${todayISO()}"></label>
-          <label class="full">Planned task<select id="c-plan"><option value="">Manual service entry</option>${taskOptions}</select></label>
+          <label class="full">Planned task<select id="c-plan" onchange="fillCompletePlan(this.value)"><option value="">Manual service entry</option>${taskOptions}</select></label>
+          <div class="full fine" id="c-plan-notes">${esc(plan ? plan.notes : "Select a planned task to show its checklist.")}</div>
           <label>Km<input id="c-km" type="number" value="${Number(v.currentKm||0)}"></label>
           <label>Hours<input id="c-hours" type="number" value="${Number(v.currentHours||0)}"></label>
           <label>Performed by<select id="c-by">${staffOptions(state.settings.lastStaff)}</select></label>
@@ -1106,6 +1341,16 @@
       byId("c-km").value = Number(v.currentKm||0);
       byId("c-hours").value = Number(v.currentHours||0);
       byId("c-plan").innerHTML = `<option value="">Manual service entry</option>` + state.plans.filter(p=>p.vehicleId===v.id).map(p=>`<option value="${p.id}">${esc(p.task)}</option>`).join("");
+      fillCompletePlan("");
+    }
+    function fillCompletePlan(planId){
+      const p = state.plans.find(x=>x.id===planId);
+      const task = byId("c-task");
+      const parts = byId("c-parts");
+      const notes = byId("c-plan-notes");
+      if(task) task.value = p ? p.task : "";
+      if(parts) parts.value = p ? (p.parts||"") : "";
+      if(notes) notes.textContent = p ? (p.notes||"") : "Select a planned task to show its checklist.";
     }
     function openHistoryModal(id,vehicleId){
       const h = state.history.find(x=>x.id===id) || {id:null,vehicleId:vehicleId||state.selectedVehicleId||state.vehicles[0]?.id,date:todayISO(),task:"",km:0,hours:0,parts:"",cost:0,performedBy:state.settings.lastStaff||"",notes:""};
@@ -1212,6 +1457,7 @@
       a.remove();
       URL.revokeObjectURL(url);
     }
+    if(ensureDmaxServiceSchedule()) saveLocal();
     render();
     if(SCRIPT_URL){ pullFromSheet(); setInterval(pollSheet, 30000); }
   </script>
