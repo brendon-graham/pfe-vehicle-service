@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="app-version" content="v1.4.0">
+  <meta name="app-version" content="v1.4.1">
   <title>PFE Vehicle Service</title>
   <style>
     :root{
@@ -111,6 +111,13 @@
     .check-item select[data-flag="flag"]{border-color:var(--bad);background:var(--bad-bg);color:var(--bad)}
     .check-item select[data-flag="watch"]{border-color:var(--warn);background:var(--warn-bg);color:var(--warn)}
     .flag-note{font-weight:700}
+    .service-checklist{background:var(--surface-2);border:1px solid var(--line);border-radius:var(--radius);padding:10px;display:grid;gap:8px}
+    .check-head{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+    .check-head strong{font-size:14px}
+    .check-list{display:grid;gap:6px}
+    .service-check{display:grid;grid-template-columns:24px 1fr;align-items:start;gap:8px;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:8px;font-size:14px;font-weight:700;color:var(--ink)}
+    .service-check input{width:18px;min-height:18px;margin:1px 0 0}
+    .service-check .check-text{line-height:1.25}
     @media (max-width:860px){
       .grid.cols-2,.grid.cols-3,.grid.cols-4{grid-template-columns:1fr}
       .split{grid-template-columns:1fr}
@@ -151,7 +158,7 @@
           </div>
         </div>
         <div class="head-actions">
-          <span class="pill" id="version-pill">v1.4.0</span>
+          <span class="pill" id="version-pill">v1.4.1</span>
           <button class="primary" onclick="openCompleteService()">Complete service</button>
           <button onclick="openVehicleModal()">Add vehicle</button>
         </div>
@@ -181,7 +188,7 @@
   <input type="file" id="restore-file" accept="application/json" hidden>
 
   <script>
-    const VERSION = "v1.4.0";
+    const VERSION = "v1.4.1";
     // Sheets sync LIVE from v1.3.2 (SCRIPT_URL set). Empty-sheet seed guard + staff coercion from v1.3.1.
     const STORAGE_KEY = "pfe_vehicle_service_v1";
     // Google Sheets sync. Paste the Apps Script Web App URL to turn sync ON.
@@ -903,6 +910,372 @@
       {targets:["valtra-t175"],key:"valtra-hydraulic-oil",name:"Valtra hydraulic/transmission oil",supplier:"Valtra/AGCO dealer or oil supplier",reorder:1,location:"Order when due",notes:"For 1,200/2,400 h hydraulic, transmission and front axle work. Confirm exact oil by serial."},
       {targets:["valtra-t175"],key:"valtra-service-kit",name:"Valtra 50/600/1200 h service kit",supplier:"Valtra/AGCO dealer",reorder:1,location:"Order when due",notes:"Use dealer service kit by tractor serial so all seals and filters are included."}
     ];
+    const SERVICE_CHECKLISTS = {
+      "severe-oil":[
+        "Record odometer before service.",
+        "Drain and replace engine oil - D-Max low-ash diesel oil, approx 6.6 L with filter service.",
+        "Fit new sump plug washer and tighten plug.",
+        "Run engine, check oil level, top up if needed.",
+        "Check for oil leaks around sump plug, filter housing and engine.",
+        "Record oil grade, litres used and km."
+      ],
+      "oil-filter":[
+        "Record odometer before service.",
+        "Drain and replace engine oil - D-Max low-ash diesel oil, approx 6.6 L with filter.",
+        "Replace engine oil filter element and O-ring/gasket.",
+        "Fit new sump plug washer.",
+        "Run engine, check oil level and reset reminder if fitted.",
+        "Check for leaks and record parts used."
+      ],
+      "air-cleaner-check":[
+        "Open airbox and inspect air cleaner element.",
+        "Clean housing and dust drain without letting dirt into intake.",
+        "Replace element if dirty, damaged or wet.",
+        "Check airbox seal and clips.",
+        "Record dusty condition if severe."
+      ],
+      "air-cleaner-replace":[
+        "Remove and discard old air cleaner element.",
+        "Clean airbox and sealing faces.",
+        "Fit new air cleaner element by VIN/reg.",
+        "Check intake ducting, clips and dust entry.",
+        "Record part used."
+      ],
+      "full-inspection":[
+        "Check engine oil, coolant, brake fluid and washer fluid levels.",
+        "Inspect belts, hoses, fuel lines, oil/coolant/fuel/brake leaks.",
+        "Inspect steering, suspension, ball joints, king pins/pivots where fitted and wheel bearings.",
+        "Inspect brakes, tyres, spare tyre, lights, wipers and horn.",
+        "Check exhaust, chassis/body bolts, wheel nuts and underbody damage.",
+        "Check fuel tank, hoses and DPD warning status.",
+        "Record any defects for follow-up."
+      ],
+      "prop-shaft-grease":[
+        "Inspect propeller shaft universal joints and sliding sleeve.",
+        "Grease propeller shaft U-joints/sliding yoke where grease nipples are fitted.",
+        "Check for play, vibration, damage or missing clips.",
+        "Record grease used and any wear found."
+      ],
+      "brake-wear-check":[
+        "Inspect front brake pads and discs.",
+        "Inspect rear brake linings/drums or rear discs as fitted.",
+        "Check brake hoses, pipes and leaks.",
+        "Check pedal feel and park brake operation.",
+        "Record pad/lining condition."
+      ],
+      "diff-oil":[
+        "Confirm 4WD and diff-lock spec before selecting oil.",
+        "Drain front differential oil and refill with correct GL-5/GL-5 MT-1 oil if fitted.",
+        "Drain rear differential oil and refill with correct GL-5/GL-5 MT-1 oil.",
+        "Fit/check drain and filler plug washers.",
+        "Check for leaks after short run.",
+        "Record oil type and quantity used."
+      ],
+      "brake-fluid":[
+        "Confirm DOT 3 or DOT 4 fluid requirement by VIN/service book.",
+        "Replace brake fluid and clutch fluid if manual clutch fitted.",
+        "Bleed system and check pedal feel.",
+        "Inspect hoses, pipes, master cylinder and calipers/wheel cylinders for leaks.",
+        "Road-test brake feel safely and record fluid used."
+      ],
+      "cabin-filter":[
+        "Remove cabin/air-conditioning filter.",
+        "Clean leaves/dust from filter housing.",
+        "Fit new cabin filter.",
+        "Check fan airflow and smell.",
+        "Record part used."
+      ],
+      "atf-inspect":[
+        "Confirm automatic transmission spec and checking procedure.",
+        "Inspect ATF level/condition using correct temperature/procedure.",
+        "Check cooler lines, pan and seals for leaks.",
+        "Record condition and whether workshop service is needed."
+      ],
+      "atf-replace":[
+        "Confirm correct Isuzu ATF WSI and service kit by VIN.",
+        "Replace ATF using the correct Isuzu procedure.",
+        "Replace required seals/gaskets if opened.",
+        "Check level at specified temperature/procedure.",
+        "Road-test shift quality and check for leaks.",
+        "Record quantity used."
+      ],
+      "coolant":[
+        "Confirm Isuzu-approved OAT extended-life coolant.",
+        "Drain and replace engine/intercooler coolant as required.",
+        "Bleed cooling system following service procedure.",
+        "Pressure/leak check hoses, radiator, cap and water pump area.",
+        "Run to temperature, recheck level and record coolant used."
+      ],
+      "dmax-24my-scheduled-service":[
+        "Confirm 24MY D-Max service due at 15,000 km or 12 months.",
+        "Complete/book Isuzu or approved scheduled service.",
+        "Record invoice/workshop reference and km.",
+        "Check whether any severe farm-use rows also need doing.",
+        "File any warranty notes."
+      ],
+      "dmax-17my-scheduled-service":[
+        "Confirm 2017 D-Max service book interval by rego/VIN.",
+        "Complete/book Isuzu or approved scheduled service.",
+        "Record invoice/workshop reference and km.",
+        "Check whether severe farm-use rows also need doing.",
+        "File any warranty notes."
+      ],
+      "dmax-16my-scheduled-service":[
+        "Confirm 2016 D-Max build/service book interval by rego/VIN.",
+        "Complete/book Isuzu or approved scheduled service.",
+        "Record invoice/workshop reference and km.",
+        "Check whether severe farm-use rows also need doing.",
+        "File any warranty notes."
+      ],
+      "navara-severe-oil-filter":[
+        "Record odometer before service.",
+        "Drain and replace engine oil - TD25Ti diesel oil, approx 6.7 L with filter; confirm grade by service book.",
+        "Replace engine oil filter by rego/VIN.",
+        "Fit new sump washer if required.",
+        "Run engine, check oil level and check for leaks.",
+        "Record oil grade, litres used and filter part number."
+      ],
+      "navara-air-cleaner":[
+        "Remove and inspect air cleaner element.",
+        "Clean airbox and dust drain.",
+        "Replace viscous paper element if dirty, damaged or wet.",
+        "Check airbox seal, intake ducting and clamps.",
+        "Record condition and part used if replaced."
+      ],
+      "navara-fuel-filter":[
+        "Replace diesel fuel filter by rego/VIN.",
+        "Prime/bleed fuel system correctly.",
+        "Check for leaks and water contamination.",
+        "Start engine and confirm smooth running.",
+        "Record filter part number."
+      ],
+      "navara-brake-inspection":[
+        "Inspect brake pads, discs, shoes and drums.",
+        "Inspect brake lines, hoses and leaks.",
+        "Check park brake travel and holding.",
+        "Check steering linkage, front axle joints, king pins/pivots where fitted and suspension wear.",
+        "Record defects or parts needed."
+      ],
+      "navara-brake-fluid":[
+        "Confirm DOT 3 or DOT 4 fluid by service book.",
+        "Replace brake and clutch fluid as fitted.",
+        "Bleed system and check pedal feel.",
+        "Inspect hoses and leaks.",
+        "Road-test brake operation safely."
+      ],
+      "navara-4wd-driveline-oils":[
+        "Confirm manual transmission, transfer and diff oil grades before draining.",
+        "Inspect/replace manual transmission oil if due.",
+        "Inspect/replace transfer case oil.",
+        "Inspect/replace front and rear differential oils.",
+        "Check plugs, breathers, seals and leaks.",
+        "Record oil types and quantities."
+      ],
+      "navara-prop-shaft-grease":[
+        "Grease steering linkage points where fitted.",
+        "Grease propeller shaft/sliding joints where fitted.",
+        "Inspect front drive shafts, universal joints and boots.",
+        "Inspect suspension pins, bushes and king pins/pivots where fitted.",
+        "Re-grease after water immersion and record defects."
+      ],
+      "canam-severe-a-plus":[
+        "Record hours and km before service.",
+        "Check fault codes or warning messages.",
+        "Clean/inspect engine air filter and housing.",
+        "Clean/inspect CVT filter, CVT cover area and cooling intakes.",
+        "Clean radiator/vents and check coolant level.",
+        "Inspect brakes, steering, suspension, wheel bearings and fasteners.",
+        "Inspect drive shafts, boots, gearbox, front diff and rear final drive for leaks/damage.",
+        "Check lights, seat belts and safety items."
+      ],
+      "canam-service-a":[
+        "Record hours and km before service.",
+        "Drain and replace engine oil using XPS/equivalent 4T oil for temperature.",
+        "Replace engine oil filter by Defender HD9 serial/VIN.",
+        "Inspect/clean air filter, CVT filter and cooling system.",
+        "Inspect fuel, exhaust, brakes, controls, steering and suspension.",
+        "Check for leaks and record oil/filter parts used."
+      ],
+      "canam-service-b":[
+        "Complete Service A checklist first.",
+        "Replace/inspect gearbox oil - 75W140 synthetic gear oil.",
+        "Replace/inspect front differential oil.",
+        "Replace/inspect rear final drive oil.",
+        "Inspect drive belt/CVT and drive components.",
+        "Inspect/replace spark plugs if due; confirm part by serial.",
+        "Record fluids and quantities used."
+      ],
+      "canam-gearbox-early":[
+        "Confirm whether this is an early gearbox oil service or a recurring Service B item.",
+        "Drain gearbox oil.",
+        "Refill with 75W140 synthetic gear oil.",
+        "Check plugs, seals, breathers and leaks.",
+        "Record km/hours and whether early-service row can be removed."
+      ],
+      "canam-brake-fluid":[
+        "Replace DOT 4 brake fluid.",
+        "Bleed brakes and check pedal feel.",
+        "Inspect pads, discs, hoses and leaks.",
+        "Road-test safely.",
+        "Record fluid used."
+      ],
+      "canam-coolant":[
+        "Drain coolant.",
+        "Refill with BRP/compatible coolant.",
+        "Bleed cooling system if required.",
+        "Inspect hoses, radiator, cap and fan operation.",
+        "Run to temperature and recheck level."
+      ],
+      "honda-initial-service":[
+        "Confirm exact FourTrax model/year before doing first-service items.",
+        "Replace engine oil and oil filter if required.",
+        "Inspect brakes, steering, suspension, wheels and fasteners.",
+        "Check final drive/differential oils as fitted.",
+        "Record hours/km and mark this one-off row done or remove if already completed."
+      ],
+      "honda-oil-filter":[
+        "Record hours and km before service.",
+        "Drain and replace engine oil - Honda GN4/equivalent wet-clutch-safe oil; confirm grade/quantity by model.",
+        "Replace engine oil filter by exact FourTrax model/year.",
+        "Check oil level after running.",
+        "Check for leaks and record oil/filter part number."
+      ],
+      "honda-air-cleaner":[
+        "Remove and inspect air cleaner element/foam.",
+        "Clean/service element as model requires.",
+        "Clean airbox and drain tube.",
+        "Check intake seal and clips.",
+        "Service more often if dusty, wet or muddy."
+      ],
+      "honda-chassis-brakes":[
+        "Inspect brake pads/shoes, discs/drums and brake switch.",
+        "Inspect drive shaft boots and steering tie-rod boots.",
+        "Inspect guards, frame, suspension, wheels and tyres.",
+        "Check nuts, bolts and fasteners.",
+        "Check steering play and front hubs/king pins/pivots where fitted.",
+        "Record any defects."
+      ],
+      "honda-final-gear-oil":[
+        "Confirm front/rear final drive oil grade by exact model.",
+        "Inspect/replace front final gear or differential oil if fitted.",
+        "Inspect/replace rear final gear oil.",
+        "Check drain/fill plugs and seals.",
+        "Record oil type and quantity."
+      ],
+      "honda-brake-fluid":[
+        "Confirm DOT grade by exact Honda model.",
+        "Replace brake fluid.",
+        "Bleed brakes and check lever/pedal feel.",
+        "Inspect hoses and leaks.",
+        "Record fluid used."
+      ],
+      "honda-spark-valve-arrester":[
+        "Inspect/replace spark plug by exact model.",
+        "Check valve clearance if required by model/service book.",
+        "Clean spark arrester.",
+        "Check idle/running after service.",
+        "Record plug part number and findings."
+      ],
+      "jd-engine-oil-filter":[
+        "Record tractor hours before service.",
+        "Drain and replace engine oil - John Deere Plus-50 II, approx 23.5 L crankcase capacity.",
+        "Replace RE539279 engine oil filter.",
+        "Check oil level after running.",
+        "Check for leaks around filter and drain.",
+        "Record oil litres, filter number and whether 500 h or 750 h condition applies."
+      ],
+      "jd-fuel-filters":[
+        "Replace DZ115391 primary fuel filter.",
+        "Replace DZ115392 secondary/final fuel filter.",
+        "Prime/bleed fuel system correctly.",
+        "Check for leaks and water contamination.",
+        "Start and confirm smooth running."
+      ],
+      "jd-trans-hyd-filters":[
+        "Confirm whether this is first 100 h, first 750 h or recurring 750 h service.",
+        "Replace AL221066 transmission filter.",
+        "Replace AL169573 hydraulic filter.",
+        "Check hydraulic/transmission oil level with correct procedure.",
+        "Inspect for hydraulic leaks.",
+        "Record hours and filter numbers."
+      ],
+      "jd-primary-air-cab":[
+        "Replace AL215053 primary engine air filter.",
+        "Replace AL225552 cab fresh air filters.",
+        "Replace/clean L214634 recirculation filters as required.",
+        "Inspect intake housing and seals.",
+        "Check radiator/cooler screens and clean as needed."
+      ],
+      "jd-secondary-air":[
+        "Confirm this is every fourth primary air filter or hour/year trigger.",
+        "Replace AL215054 secondary air filter.",
+        "Keep intake opening covered while filter is out.",
+        "Inspect housing and dust seal.",
+        "Record filter number."
+      ],
+      "jd-crankcase-cab-carbon":[
+        "Confirm tractor model year/service display interval.",
+        "Replace DZ105100 crankcase vent filter if due.",
+        "Replace AL158986 activated carbon kit if fitted and due.",
+        "Inspect breather hoses and cab filter seals.",
+        "Record parts used."
+      ],
+      "jd-def-exhaust-filters":[
+        "Check display warnings for DEF/exhaust service.",
+        "Replace DZ114640 DEF injection pump filter if due.",
+        "Replace DZ110513 DEF line filter if applicable.",
+        "Inspect DEF lines, cap and tank area.",
+        "Record hours and parts used."
+      ],
+      "valtra-first-50h":[
+        "Confirm exact T175/T175ev variant and serial with dealer.",
+        "Record tractor hours before service.",
+        "Complete dealer 50 h inspection.",
+        "Replace engine oil/filter and fuel filters if included in dealer kit.",
+        "Service front axle, hydraulic return filter and low-pressure/lubrication filters as specified.",
+        "Grease all service points and check loader-frame bolts if fitted.",
+        "Run transmission calibration and road test.",
+        "Record invoice/reference and decide whether to remove this one-off row."
+      ],
+      "valtra-engine-600h":[
+        "Record tractor hours before service.",
+        "Drain and replace engine oil - approved Valtra/AGCO oil; confirm litres and grade by serial.",
+        "Replace AGCO engine oil filter.",
+        "Check battery terminals, belts, hoses and cooling system.",
+        "Check service display and reset if required.",
+        "Record oil grade, litres and filter number."
+      ],
+      "valtra-air-cooling":[
+        "Inspect/replace engine air filters as required.",
+        "Clean cab ventilation filters; shorten interval in dust.",
+        "Clean coolers/radiator externally.",
+        "Inspect belts, hoses and clamps.",
+        "Record filters replaced and any overheating/dust issues."
+      ],
+      "valtra-valves-calibration":[
+        "Confirm whether this is first 600 h or recurring 1,200 h item.",
+        "Check/adjust engine valve clearance.",
+        "Run transmission automatic calibration.",
+        "Check for active warning codes.",
+        "Record dealer/workshop reference."
+      ],
+      "valtra-1200h-filters-hydraulic":[
+        "Replace fuel filter and prefilter with original AGCO parts.",
+        "Service hydraulic oil/filter/breather items per exact variant.",
+        "Service front axle/differential/hub oil items if due by book.",
+        "Inspect hydraulic leaks and hoses.",
+        "Record oil/filter part numbers and litres.",
+        "Use 500 h fuel-filter interval if first-generation biodiesel over 7% is used."
+      ],
+      "valtra-2400h-major":[
+        "Confirm exact 2,400 h service list by T175 serial/dealer book.",
+        "Complete all lower-hour service tasks due.",
+        "Replace transmission/hydraulic oils and filters as specified.",
+        "Service front axle, hubs, coolant and brake items as specified.",
+        "Inspect steering, king pins/pivots, suspension/axle joints and hydraulic hoses.",
+        "Record dealer/workshop reference, oil types and litres."
+      ]
+    };
     const seedState = {
       activeTab:"Dashboard",
       selectedVehicleId:"veh-brendon-qls732",
@@ -1347,6 +1720,51 @@
     function byId(id){return document.getElementById(id)}
     function formVal(id){const el = byId(id); return el ? el.value.trim() : ""}
     function formNum(id){const v = formVal(id); return v === "" ? 0 : Number(v)}
+    function checklistKeyForPlan(plan){
+      if(!plan) return "";
+      const id = String(plan.id||"");
+      return Object.keys(SERVICE_CHECKLISTS).sort((a,b)=>b.length-a.length).find(key=>id.endsWith("-"+key)) || "";
+    }
+    function checklistFromNotes(notes){
+      const raw = String(notes||"");
+      const marker = raw.toLowerCase().indexOf("tick list:");
+      if(marker < 0) return [];
+      const after = raw.slice(marker + "tick list:".length);
+      const firstSentence = after.split(". ")[0] || after;
+      return firstSentence.split(";").map(s=>s.trim()).filter(Boolean).map(s=>s.charAt(0).toUpperCase()+s.slice(1));
+    }
+    function checklistForPlan(plan){
+      if(!plan) return [];
+      const key = checklistKeyForPlan(plan);
+      if(key && SERVICE_CHECKLISTS[key]) return SERVICE_CHECKLISTS[key];
+      const fromNotes = checklistFromNotes(plan.notes);
+      if(fromNotes.length) return fromNotes;
+      if(plan.parts) return ["Use/check parts: " + plan.parts, "Record km/hours, date and any defects."];
+      return [];
+    }
+    function renderCompleteChecklist(plan){
+      if(!plan) return `<div class="fine">Select a planned task to show its checklist.</div>`;
+      const items = checklistForPlan(plan);
+      if(!items.length) return `<div class="fine">No checklist saved for this task. Use notes for manual work done.</div>`;
+      return `<div class="check-list">${items.map((item,i)=>`
+        <label class="service-check" for="c-check-${i}">
+          <input id="c-check-${i}" type="checkbox">
+          <span class="check-text">${esc(item)}</span>
+        </label>`).join("")}</div>`;
+    }
+    function setCompleteChecklist(checked){
+      document.querySelectorAll("#c-checklist input[type='checkbox']").forEach(cb=>{ cb.checked = checked; });
+    }
+    function completeChecklistSummary(){
+      const rows = Array.from(document.querySelectorAll("#c-checklist .service-check"));
+      if(!rows.length) return "";
+      const lines = rows.map(row=>{
+        const cb = row.querySelector("input[type='checkbox']");
+        const label = row.querySelector(".check-text")?.textContent.trim() || "";
+        return (cb?.checked ? "[x] " : "[ ] ") + label;
+      }).filter(Boolean);
+      return lines.length ? "Checklist:\n" + lines.join("\n") : "";
+    }
     function niceDate(d){
       if(!d) return "-";
       const dt = new Date(d + "T00:00:00");
@@ -1950,6 +2368,16 @@
           <label>Vehicle<select id="c-vehicle" onchange="refreshCompleteTasks(this.value)">${vehicleOptions(v.id)}</select></label>
           <label>Date<input id="c-date" type="date" value="${todayISO()}"></label>
           <label class="full">Planned task<select id="c-plan" onchange="fillCompletePlan(this.value)"><option value="">Manual service entry</option>${taskOptions}</select></label>
+          <div class="full service-checklist">
+            <div class="check-head">
+              <strong>Service checklist</strong>
+              <div class="actions">
+                <button class="slim" onclick="setCompleteChecklist(true)">Tick all</button>
+                <button class="slim ghost" onclick="setCompleteChecklist(false)">Clear</button>
+              </div>
+            </div>
+            <div id="c-checklist">${renderCompleteChecklist(plan)}</div>
+          </div>
           <div class="full fine" id="c-plan-notes">${esc(plan ? plan.notes : "Select a planned task to show its checklist.")}</div>
           <label>Km<input id="c-km" type="number" value="${Number(v.currentKm||0)}"></label>
           <label>Hours<input id="c-hours" type="number" value="${Number(v.currentHours||0)}"></label>
@@ -1964,6 +2392,9 @@
           const target = state.vehicles.find(x=>x.id===formVal("c-vehicle"));
           const chosen = state.plans.find(p=>p.id===formVal("c-plan"));
           if(target){
+            const checklistText = completeChecklistSummary();
+            const manualNotes = formVal("c-notes");
+            const historyNotes = [checklistText, manualNotes ? "Notes:\n" + manualNotes : ""].filter(Boolean).join("\n\n");
             target.currentKm = formNum("c-km");
             target.currentHours = formNum("c-hours");
             target.updatedAt = stampNow();
@@ -1973,7 +2404,8 @@
               chosen.lastDate = formVal("c-date") || todayISO();
               chosen.updatedAt = stampNow();
             }
-            state.history.push({id:idNew("hist"),vehicleId:target.id,date:formVal("c-date")||todayISO(),task:formVal("c-task")||chosen?.task||"Service",km:target.currentKm,hours:target.currentHours,parts:formVal("c-parts"),cost:formNum("c-cost"),performedBy:formVal("c-by"),notes:formVal("c-notes"),updatedAt:stampNow()});
+            state.settings.lastStaff = formVal("c-by") || state.settings.lastStaff;
+            state.history.push({id:idNew("hist"),vehicleId:target.id,date:formVal("c-date")||todayISO(),task:formVal("c-task")||chosen?.task||"Service",km:target.currentKm,hours:target.currentHours,parts:formVal("c-parts"),cost:formNum("c-cost"),performedBy:formVal("c-by"),notes:historyNotes,updatedAt:stampNow()});
             state.selectedVehicleId = target.id;
           }
           closeModal();
@@ -1993,9 +2425,11 @@
       const task = byId("c-task");
       const parts = byId("c-parts");
       const notes = byId("c-plan-notes");
+      const checklist = byId("c-checklist");
       if(task) task.value = p ? p.task : "";
       if(parts) parts.value = p ? (p.parts||"") : "";
       if(notes) notes.textContent = p ? (p.notes||"") : "Select a planned task to show its checklist.";
+      if(checklist) checklist.innerHTML = renderCompleteChecklist(p);
     }
     function openHistoryModal(id,vehicleId){
       const h = state.history.find(x=>x.id===id) || {id:null,vehicleId:vehicleId||state.selectedVehicleId||state.vehicles[0]?.id,date:todayISO(),task:"",km:0,hours:0,parts:"",cost:0,performedBy:state.settings.lastStaff||"",notes:""};

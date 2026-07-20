@@ -5,7 +5,7 @@ Vehicle and equipment service tracker for Peel Forest Estate. Single-file PWA:
 
 - **Live:** https://brendon-graham.github.io/pfe-vehicle-service/
 - **Users:** Aaron and staff update readings, complete services, run weekly checks, add parts, and note defects. Brendon reviews overdue/upcoming work, red flags, costs, history, and export reports.
-- **Version:** v1.4.0
+- **Version:** v1.4.1
 
 ## Data
 
@@ -25,6 +25,7 @@ guard, and staff-array coercion.
 - Dashboard and Weekly Check toolbox lists for unresolved red flags.
 - Service plan, service history, parts stock, reorder warnings, JSON backup/restore, CSV export, and print review.
 - Manual-derived service schedule pack loaded for D-Max, Navara, Can-Am Defender, Honda FourTrax, John Deere 6175M, and Valtra T175/T175ev units, with model-confirmation notes.
+- Complete Service shows tappable service checklist rows for manual-backed tasks and records checked/unchecked items into History.
 
 ## Deploy
 
