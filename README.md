@@ -5,7 +5,7 @@ Vehicle and equipment service tracker for Peel Forest Estate. Single-file PWA:
 
 - **Live:** https://brendon-graham.github.io/pfe-vehicle-service/
 - **Users:** Aaron and staff update readings, complete services, run weekly checks, add parts, and note defects. Brendon reviews overdue/upcoming work, red flags, costs, history, and export reports.
-- **Version:** v1.4.1
+- **Version:** v1.4.2
 
 ## Data
 

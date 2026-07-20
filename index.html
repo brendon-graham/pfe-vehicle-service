@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="app-version" content="v1.4.1">
+  <meta name="app-version" content="v1.4.2">
   <title>PFE Vehicle Service</title>
   <style>
     :root{
@@ -118,6 +118,16 @@
     .service-check{display:grid;grid-template-columns:24px 1fr;align-items:start;gap:8px;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:8px;font-size:14px;font-weight:700;color:var(--ink)}
     .service-check input{width:18px;min-height:18px;margin:1px 0 0}
     .service-check .check-text{line-height:1.25}
+    .task-preview{margin-top:8px;width:100%;display:grid;gap:4px;text-align:left;background:var(--surface-2);border:1px solid var(--line);padding:8px;border-radius:var(--radius);font-size:12px}
+    .task-preview:hover{border-color:var(--brand)}
+    .task-preview .task-count{font-weight:900;color:var(--brand)}
+    .task-preview .task-line{display:block;color:var(--ink);font-weight:700;line-height:1.25}
+    .task-preview .task-more{color:var(--muted);font-weight:800}
+    .service-task-list{margin:0;padding-left:22px;display:grid;gap:8px}
+    .service-task-list li{font-weight:700;line-height:1.35}
+    .service-task-meta{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+    .service-task-meta div{background:var(--surface-2);border-radius:var(--radius);padding:8px}
+    .service-task-meta strong{display:block;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
     @media (max-width:860px){
       .grid.cols-2,.grid.cols-3,.grid.cols-4{grid-template-columns:1fr}
       .split{grid-template-columns:1fr}
@@ -134,6 +144,7 @@
       .head,.status-inner{max-width:100vw;overflow-x:hidden}
       .status-inner .actions{max-width:100%;overflow-x:auto;flex-wrap:nowrap;padding-bottom:2px}
       .form-grid{grid-template-columns:1fr}
+      .service-task-meta{grid-template-columns:1fr}
       .kv{grid-template-columns:1fr 1fr}
       th,td{padding:9px 8px}
       .side{grid-template-columns:1fr}
@@ -158,7 +169,7 @@
           </div>
         </div>
         <div class="head-actions">
-          <span class="pill" id="version-pill">v1.4.1</span>
+          <span class="pill" id="version-pill">v1.4.2</span>
           <button class="primary" onclick="openCompleteService()">Complete service</button>
           <button onclick="openVehicleModal()">Add vehicle</button>
         </div>
@@ -188,7 +199,7 @@
   <input type="file" id="restore-file" accept="application/json" hidden>
 
   <script>
-    const VERSION = "v1.4.1";
+    const VERSION = "v1.4.2";
     // Sheets sync LIVE from v1.3.2 (SCRIPT_URL set). Empty-sheet seed guard + staff coercion from v1.3.1.
     const STORAGE_KEY = "pfe_vehicle_service_v1";
     // Google Sheets sync. Paste the Apps Script Web App URL to turn sync ON.
@@ -1423,9 +1434,12 @@
       state.plans = Array.isArray(state.plans) ? state.plans : [];
       state.parts = Array.isArray(state.parts) ? state.parts : [];
       state.settings = {...structuredClone(seedState.settings),...(state.settings||{})};
-      if(state.settings.dmaxScheduleVersion === DMAX_SCHEDULE_VERSION) return false;
       const dmaxVehicles = state.vehicles.filter(isDmaxVehicle);
       if(!dmaxVehicles.length) return false;
+      const dmaxPlanIds = dmaxVehicles.flatMap(v=>DMAX_PLAN_TEMPLATES.map(t=>dmaxPlanId(v.id,t.key)));
+      const dmaxPartIds = DMAX_PART_TEMPLATES.map(t=>dmaxPartId(t.key));
+      const dmaxRowsPresent = dmaxPlanIds.every(id=>state.plans.some(p=>p.id===id)) && dmaxPartIds.every(id=>state.parts.some(p=>p.id===id));
+      if(state.settings.dmaxScheduleVersion === DMAX_SCHEDULE_VERSION && dmaxRowsPresent) return false;
       const now = stampNow();
       let changed = false;
       const existingPlanIds = new Set(state.plans.map(p=>p.id));
@@ -1485,9 +1499,17 @@
       state.plans = Array.isArray(state.plans) ? state.plans : [];
       state.parts = Array.isArray(state.parts) ? state.parts : [];
       state.settings = {...structuredClone(seedState.settings),...(state.settings||{})};
-      if(state.settings.fleetManualScheduleVersion === FLEET_MANUAL_SCHEDULE_VERSION) return false;
       const now = stampNow();
       let changed = ensureManualScheduleVehicles(now);
+      const fleetPlansPresent = FLEET_PLAN_TEMPLATES.every(t=>{
+        const vehicles = state.vehicles.filter(v=>vehicleMatchesTarget(v,t.target));
+        return !vehicles.length || vehicles.every(v=>state.plans.some(p=>p.id===manualPlanId(v.id,t.key)));
+      });
+      const fleetPartsPresent = FLEET_PART_TEMPLATES.every(t=>{
+        const vehicleIds = state.vehicles.filter(v=>vehicleMatchesTargets(v,t.targets)).map(v=>v.id);
+        return !vehicleIds.length || state.parts.some(p=>p.id===manualPartId(t.key));
+      });
+      if(!changed && state.settings.fleetManualScheduleVersion === FLEET_MANUAL_SCHEDULE_VERSION && fleetPlansPresent && fleetPartsPresent) return false;
       const existingPlanIds = new Set(state.plans.map(p=>p.id));
       FLEET_PLAN_TEMPLATES.forEach(t=>{
         const vehicles = state.vehicles.filter(v=>vehicleMatchesTarget(v,t.target));
@@ -1751,6 +1773,17 @@
           <input id="c-check-${i}" type="checkbox">
           <span class="check-text">${esc(item)}</span>
         </label>`).join("")}</div>`;
+    }
+    function renderPlanTaskPreview(plan){
+      const items = checklistForPlan(plan);
+      if(!items.length) return `<div class="fine">No checklist tasks saved.</div>`;
+      const preview = items.slice(0,3).map(item=>`<span class="task-line">- ${esc(item)}</span>`).join("");
+      const more = items.length > 3 ? `<span class="task-more">+${items.length - 3} more - open tasks</span>` : `<span class="task-more">Open tasks</span>`;
+      return `<button type="button" class="task-preview" onclick="openServiceTasks('${plan.id}')">
+        <span class="task-count">${items.length} service task${items.length===1?"":"s"}</span>
+        ${preview}
+        ${more}
+      </button>`;
     }
     function setCompleteChecklist(checked){
       document.querySelectorAll("#c-checklist input[type='checkbox']").forEach(cb=>{ cb.checked = checked; });
@@ -2028,10 +2061,11 @@
         <tbody>${rows.map(r=>`<tr>
           <td><span class="pill ${r.due.level}">${r.due.label}</span><div class="fine">${esc(r.due.details.join(", "))}</div></td>
           <td>${esc(vehicleName(r.vehicleId))}</td>
-          <td><strong>${esc(r.task)}</strong><div class="fine">${esc(r.parts||"")}</div></td>
+          <td><strong>${esc(r.task)}</strong><div class="fine">${esc(r.parts||"")}</div>${renderPlanTaskPreview(r)}</td>
           <td>${intervalText(r)}</td>
           <td>${niceDate(r.lastDate)}<div class="fine">${num(r.lastKm)} km / ${num(r.lastHours)} hrs</div></td>
           <td class="right nowrap">
+            <button class="slim" onclick="openServiceTasks('${r.id}')">Tasks</button>
             <button class="slim" onclick="openCompleteService('${r.id}')">Done</button>
             <button class="slim" onclick="openPlanModal('${r.id}')">Edit</button>
           </td>
@@ -2356,6 +2390,35 @@
     function deletePlan(id){
       if(!confirm("Delete this service task?")) return;
       mutate(()=>{state.plans = state.plans.filter(p=>p.id!==id); pendingDeletes.plans.push(id); closeModal();},"Task deleted");
+    }
+    function openServiceTasks(planId){
+      const plan = state.plans.find(p=>p.id===planId);
+      if(!plan) return;
+      const items = checklistForPlan(plan);
+      openModal("Service tasks",`
+        <div class="grid">
+          <div>
+            <strong>${esc(plan.task)}</strong>
+            <div class="fine">${esc(vehicleName(plan.vehicleId))}</div>
+          </div>
+          <div class="service-task-meta">
+            <div><strong>Interval</strong>${intervalText(plan)}</div>
+            <div><strong>Last done</strong>${niceDate(plan.lastDate)}<br>${num(plan.lastKm)} km / ${num(plan.lastHours)} hrs</div>
+            <div><strong>Parts</strong>${esc(plan.parts||"None listed")}</div>
+            <div><strong>Status</strong>${esc(assessPlan(plan).label)}</div>
+          </div>
+          <div class="service-checklist">
+            <div class="check-head">
+              <strong>Checklist tasks</strong>
+              <span class="pill">${items.length} item${items.length===1?"":"s"}</span>
+            </div>
+            ${items.length ? `<ol class="service-task-list">${items.map(item=>`<li>${esc(item)}</li>`).join("")}</ol>` : `<div class="fine">No checklist tasks saved for this service yet.</div>`}
+          </div>
+          ${plan.notes ? `<div class="fine">${esc(plan.notes)}</div>` : ""}
+        </div>`,
+        "Open tick-off",
+        ()=>openCompleteService(plan.id)
+      );
     }
     function openCompleteService(planId,vehicleId){
       const plan = state.plans.find(p=>p.id===planId);
