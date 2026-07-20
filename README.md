@@ -5,7 +5,7 @@ Vehicle and equipment service tracker for Peel Forest Estate. Single-file PWA:
 
 - **Live:** https://brendon-graham.github.io/pfe-vehicle-service/
 - **Users:** Aaron and staff update readings, complete services, run weekly checks, add parts, and note defects. Brendon reviews overdue/upcoming work, red flags, costs, history, and export reports.
-- **Version:** v1.3.3
+- **Version:** v1.4.0
 
 ## Data
 
@@ -19,12 +19,12 @@ guard, and staff-array coercion.
 
 ## Current Features
 
-- 18-unit PFE fleet: vehicles, trailers, tractors, and loaders.
+- 20-unit PFE fleet: vehicles, trailers, tractors, loaders, side-by-side, and ATV.
 - Category grouping: Vehicle / Trailer / Implement.
 - Weekly Check tab with staff-stamped OK / Watch / Red flag checks.
 - Dashboard and Weekly Check toolbox lists for unresolved red flags.
 - Service plan, service history, parts stock, reorder warnings, JSON backup/restore, CSV export, and print review.
-- 24MY Isuzu D-Max schedule loaded for D-Max utes, with manual/model confirmation notes.
+- Manual-derived service schedule pack loaded for D-Max, Navara, Can-Am Defender, Honda FourTrax, John Deere 6175M, and Valtra T175/T175ev units, with model-confirmation notes.
 
 ## Deploy
 
@@ -35,8 +35,8 @@ guard, and staff-array coercion.
 
 ## Open Items
 
-- Enter/confirm last done km/date for D-Max service-plan rows.
-- Confirm WOF, rego, and service intervals for non-D-Max units.
+- Enter/confirm last done km/date/hours for the manual-derived service-plan rows.
+- Confirm exact model/year/VIN/serial for the Can-Am Defender HD9 XU, Honda FourTrax, Navara DX 4WD S/C 2.5D, John Deere 6175M, and Valtra T175/T175ev before warranty-critical servicing.
 - Confirm engine hours on tractors/loaders and odometers on the Navara and Helen's D-Max.
 - Confirm regos for the five trailers marked unknown and the Manitou plate/model.
 - Redeploy the Apps Script after `Code.gs` changes so the live sheet endpoint uses the latest headers.

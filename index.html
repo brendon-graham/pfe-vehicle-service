@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="app-version" content="v1.3.3">
+  <meta name="app-version" content="v1.4.0">
   <title>PFE Vehicle Service</title>
   <style>
     :root{
@@ -151,7 +151,7 @@
           </div>
         </div>
         <div class="head-actions">
-          <span class="pill" id="version-pill">v1.3.3</span>
+          <span class="pill" id="version-pill">v1.4.0</span>
           <button class="primary" onclick="openCompleteService()">Complete service</button>
           <button onclick="openVehicleModal()">Add vehicle</button>
         </div>
@@ -181,7 +181,7 @@
   <input type="file" id="restore-file" accept="application/json" hidden>
 
   <script>
-    const VERSION = "v1.3.3";
+    const VERSION = "v1.4.0";
     // Sheets sync LIVE from v1.3.2 (SCRIPT_URL set). Empty-sheet seed guard + staff coercion from v1.3.1.
     const STORAGE_KEY = "pfe_vehicle_service_v1";
     // Google Sheets sync. Paste the Apps Script Web App URL to turn sync ON.
@@ -388,6 +388,521 @@
       {key:"atf",name:"D-Max ISUZU ATF WSI",supplier:"Isuzu",reorder:1,location:"Order when due",notes:"For automatic transmission service. Dealer/workshop job unless correct procedure and quantity are confirmed."},
       {key:"coolant",name:"D-Max OAT extended-life coolant",supplier:"Isuzu or coolant supplier",reorder:1,location:"Order when due",notes:"Use coolant meeting the Isuzu standard. Manual recommends 50/50 pre-diluted product."}
     ];
+    const FLEET_MANUAL_SCHEDULE_VERSION = "2026-07-20-fleet-manual-schedules-v1";
+    const FLEET_MANUAL_NOTE = "Fleet manual schedule pack loaded 20 Jul 2026. Confirm exact model, VIN/serial, local service book and dealer/warranty requirements before warranty-critical work.";
+    const DMAX_YEAR_NOTE = "Isuzu UTE service interval source checked 20 Jul 2026. This row is the official scheduled-service booking reminder; the detailed D-Max farm severe tasks are separate.";
+    const NAVARA_MANUAL_NOTE = "Nissan D22/Navara TD25Ti manual schedule source checked 20 Jul 2026. Matched to the PFE Navara DX 4WD S/C 2.5D request; confirm exact engine/year/service book before warranty-critical work.";
+    const CANAM_MANUAL_NOTE = "2022 Can-Am Defender/Traxter operator guide source checked 20 Jul 2026. Matched to Defender HD9 XU 900 request; confirm serial and exact variant with BRP/Can-Am.";
+    const HONDA_MANUAL_NOTE = "Honda FourTrax baseline schedule source checked 20 Jul 2026. Exact FourTrax model/year was not supplied, so confirm Foreman/Rancher/Rubicon/TRX model before relying on warranty-critical intervals.";
+    const JD_MANUAL_NOTE = "John Deere 6M 6155M/6175M/6195M quick-reference guide source checked 20 Jul 2026. Matched to the PFE John Deere 6175M.";
+    const VALTRA_MANUAL_NOTE = "Valtra T Series/Stage V schedule sources checked 20 Jul 2026. Matched to PFE Valtra T175/T175ev 2024 request; confirm exact T175 variant and dealer book.";
+    const MANUAL_VEHICLE_TEMPLATES = [
+      {
+        id:"veh-canam-defender-hd9-xu",
+        target:"canam-defender",
+        name:"Can-Am Defender HD9 XU",
+        rego:"",
+        type:"Side-by-side",
+        makeModel:"Can-Am Defender HD9 XU 900",
+        year:"2022",
+        assignedTo:"",
+        location:"Peel Forest",
+        currentKm:0,
+        currentHours:0,
+        status:"Active",
+        notes:"PFE side-by-side. Added from the manual schedule request on 20 Jul 2026. Confirm VIN/serial, current hours and km."
+      },
+      {
+        id:"veh-honda-fourtrax",
+        target:"honda-fourtrax",
+        name:"Honda FourTrax 4-wheeler",
+        rego:"",
+        type:"ATV",
+        makeModel:"Honda FourTrax (model TBC)",
+        year:"",
+        assignedTo:"",
+        location:"Peel Forest",
+        currentKm:0,
+        currentHours:0,
+        status:"Active",
+        notes:"PFE four-wheeler. Added from the manual schedule request on 20 Jul 2026. Confirm exact FourTrax model/year and current hours."
+      }
+    ];
+    const FLEET_PLAN_TEMPLATES = [
+      {
+        target:"dmax-2024",
+        key:"dmax-24my-scheduled-service",
+        task:"D-Max 24MY scheduled service booking",
+        priority:"Normal",
+        everyKm:15000,
+        everyMonths:12,
+        parts:"Book Isuzu/approved service; service parts per book",
+        estHours:0.3,
+        supplier:"Isuzu or approved workshop",
+        notes:"Book and record the official 24MY scheduled service at 15,000 km or 12 months, whichever comes first. Keep the D-Max severe farm tasks in this plan as extra maintenance where use is dusty, towing, low-speed or off-road. " + DMAX_YEAR_NOTE
+      },
+      {
+        target:"dmax-2017",
+        key:"dmax-17my-scheduled-service",
+        task:"D-Max 2017 scheduled service booking",
+        priority:"Normal",
+        everyKm:10000,
+        everyMonths:12,
+        parts:"Book Isuzu/approved service; service parts per book",
+        estHours:0.3,
+        supplier:"Isuzu or approved workshop",
+        notes:"Book and record the 16.5MY/17MY scheduled service at 10,000 km or 12 months, whichever comes first. Confirm the actual NZ service book by rego/VIN if the ute build date differs. " + DMAX_YEAR_NOTE
+      },
+      {
+        target:"dmax-2016",
+        key:"dmax-16my-scheduled-service",
+        task:"D-Max 2016 scheduled service booking",
+        priority:"Normal",
+        everyKm:10000,
+        everyMonths:12,
+        parts:"Book Isuzu/approved service; service parts per book",
+        estHours:0.3,
+        supplier:"Isuzu or approved workshop",
+        notes:"Book and record the official scheduled service at 10,000 km or 12 months if the ute is 16.5MY or 17MY. If an early-2016 build is earlier than 16.5MY, confirm whether the 10,000 km/6 month service book applies. " + DMAX_YEAR_NOTE
+      },
+      {
+        target:"navara-dx",
+        key:"navara-severe-oil-filter",
+        task:"Navara severe oil and filter service",
+        priority:"High",
+        everyKm:5000,
+        everyMonths:3,
+        parts:"Diesel engine oil; engine oil filter; drain washer",
+        estHours:1,
+        supplier:"Nissan or parts supplier",
+        notes:"Tick list: replace engine oil and oil filter; check for leaks; record km and oil grade. Farm/dust/towing/idle use fits the severe table, which shortens oil and filter to every 5,000 km or 3 months. " + NAVARA_MANUAL_NOTE
+      },
+      {
+        target:"navara-dx",
+        key:"navara-air-cleaner",
+        task:"Navara air cleaner service",
+        priority:"Normal",
+        everyKm:20000,
+        everyMonths:12,
+        parts:"Air cleaner element",
+        estHours:0.4,
+        supplier:"Nissan or parts supplier",
+        notes:"Tick list: inspect, clean or replace the viscous paper air cleaner element; check the airbox seal and dust entry. Service more often in dust, sand, mud or off-road work. " + NAVARA_MANUAL_NOTE
+      },
+      {
+        target:"navara-dx",
+        key:"navara-fuel-filter",
+        task:"Navara fuel filter replace",
+        priority:"High",
+        everyKm:20000,
+        everyMonths:12,
+        parts:"Diesel fuel filter",
+        estHours:0.8,
+        supplier:"Nissan or parts supplier",
+        notes:"Tick list: replace diesel fuel filter; bleed/prime correctly; check for leaks and water contamination; record part used. Severe dusty/adverse conditions shorten this item. " + NAVARA_MANUAL_NOTE
+      },
+      {
+        target:"navara-dx",
+        key:"navara-brake-inspection",
+        task:"Navara brake component inspection",
+        priority:"High",
+        everyKm:10000,
+        everyMonths:6,
+        parts:"Brake pads/shoes if worn",
+        estHours:0.7,
+        supplier:"Workshop",
+        notes:"Tick list: inspect brake pads, discs, shoes, drums, lines and hoses; check park brake and pedal feel. Rough/muddy roads, towing and frequent braking require more frequent checks. " + NAVARA_MANUAL_NOTE
+      },
+      {
+        target:"navara-dx",
+        key:"navara-brake-fluid",
+        task:"Navara brake/clutch fluid replace",
+        priority:"High",
+        everyKm:20000,
+        everyMonths:12,
+        parts:"DOT 3 or DOT 4 brake/clutch fluid",
+        estHours:1,
+        supplier:"Workshop",
+        notes:"Tick list: replace brake and clutch fluid with the correct DOT fluid for the vehicle; check hoses and leaks; road-test brake feel safely. " + NAVARA_MANUAL_NOTE
+      },
+      {
+        target:"navara-dx",
+        key:"navara-4wd-driveline-oils",
+        task:"Navara 4WD transfer and diff oils",
+        priority:"Normal",
+        everyKm:10000,
+        everyMonths:6,
+        parts:"Manual transmission/transfer/differential oils as applicable",
+        estHours:1.5,
+        supplier:"Workshop",
+        notes:"Tick list: inspect/replace transfer fluid, differential oils and manual transmission oil as applicable; check plugs, breathers and leaks. Off-road, mud, water, rough roads and towing require more frequent driveline service. " + NAVARA_MANUAL_NOTE
+      },
+      {
+        target:"navara-dx",
+        key:"navara-prop-shaft-grease",
+        task:"Navara steering and prop-shaft grease/check",
+        priority:"Normal",
+        everyKm:10000,
+        everyMonths:6,
+        parts:"NLGI No.2 grease",
+        estHours:0.6,
+        supplier:"Workshop",
+        notes:"Tick list: lubricate steering linkage, propeller shaft and suspension grease points where fitted; inspect steering gear, axle, suspension parts, prop shafts and front drive shafts. Re-grease after water immersion. " + NAVARA_MANUAL_NOTE
+      },
+      {
+        target:"canam-defender",
+        key:"canam-severe-a-plus",
+        task:"Defender severe/work service A+",
+        priority:"High",
+        everyKm:1500,
+        everyHours:100,
+        everyMonths:6,
+        parts:"Filters/consumables as inspection requires",
+        estHours:2,
+        supplier:"Can-Am/BRP or workshop",
+        notes:"Tick list: check fault codes; clean/inspect engine air filter, CVT filter, radiator and vents; inspect brakes, drive components, gearbox, front diff, rear final drive, steering, suspension, fasteners, lights and seat belts. Use whichever comes first: 6 months, 100 h or 1,500 km. " + CANAM_MANUAL_NOTE
+      },
+      {
+        target:"canam-defender",
+        key:"canam-service-a",
+        task:"Defender service A - oil/filter",
+        priority:"High",
+        everyKm:3000,
+        everyHours:200,
+        everyMonths:12,
+        parts:"XPS/equivalent engine oil; engine oil filter; air filter as needed",
+        estHours:2,
+        supplier:"Can-Am/BRP or workshop",
+        notes:"Tick list: replace engine oil and filter; inspect/clean air and fuel delivery, cooling, exhaust, HVAC filters if fitted, brake components, CVT, controls and chassis. Regular duty interval is 1 year, 200 h or 3,000 km; severe/work use also includes the A+ row. " + CANAM_MANUAL_NOTE
+      },
+      {
+        target:"canam-defender",
+        key:"canam-service-b",
+        task:"Defender service B - driveline fluids",
+        priority:"High",
+        everyKm:6000,
+        everyHours:400,
+        everyMonths:24,
+        parts:"75W140 gearbox oil; front diff/rear final drive oil; spark plugs if due",
+        estHours:3,
+        supplier:"Can-Am/BRP or workshop",
+        notes:"Tick list: complete A tasks; replace/inspect gearbox oil, front differential oil, rear final drive oil, spark plugs and drive components per model. Regular B interval is 2 years, 400 h or 6,000 km. " + CANAM_MANUAL_NOTE
+      },
+      {
+        target:"canam-defender",
+        key:"canam-gearbox-early",
+        task:"Defender gearbox oil early service",
+        priority:"High",
+        everyKm:1500,
+        everyHours:100,
+        everyMonths:6,
+        parts:"75W140 synthetic gearbox oil",
+        estHours:0.8,
+        supplier:"Can-Am/BRP or workshop",
+        notes:"Early gearbox oil reminder: for severe or deep mud/water use, replace at the first 1,500 km and 3,000 km; for regular duty replace at the first 3,000 km and 6,000 km, then follow the Service B row. After the early services are logged, change or remove this row if it becomes noisy. " + CANAM_MANUAL_NOTE
+      },
+      {
+        target:"canam-defender",
+        key:"canam-brake-fluid",
+        task:"Defender brake fluid replace",
+        priority:"High",
+        everyMonths:24,
+        parts:"DOT 4 brake fluid",
+        estHours:1,
+        supplier:"Can-Am/BRP or workshop",
+        notes:"Tick list: replace brake fluid every 2 years; inspect brake components and function; road-test safely. " + CANAM_MANUAL_NOTE
+      },
+      {
+        target:"canam-defender",
+        key:"canam-coolant",
+        task:"Defender coolant replace",
+        priority:"Normal",
+        everyKm:12000,
+        everyMonths:60,
+        parts:"BRP/compatible coolant",
+        estHours:1.5,
+        supplier:"Can-Am/BRP or workshop",
+        notes:"Tick list: replace coolant at 5 years or 12,000 km; inspect hoses, radiator and cooling function; record coolant used. " + CANAM_MANUAL_NOTE
+      },
+      {
+        target:"honda-fourtrax",
+        key:"honda-initial-service",
+        task:"FourTrax initial service check",
+        priority:"High",
+        everyKm:150,
+        everyHours:20,
+        everyMonths:1,
+        parts:"Engine oil; oil filter; inspection consumables",
+        estHours:1.5,
+        supplier:"Honda dealer or workshop",
+        notes:"Initial service reminder for a new or newly reset FourTrax: 100 mi / 150 km, 20 h or 1 month. After confirmed complete on an older machine, change or remove this row if it becomes noisy. " + HONDA_MANUAL_NOTE
+      },
+      {
+        target:"honda-fourtrax",
+        key:"honda-oil-filter",
+        task:"FourTrax engine oil and filter",
+        priority:"High",
+        everyKm:1000,
+        everyHours:100,
+        everyMonths:12,
+        parts:"Honda GN4/equivalent 10W-30 4-stroke oil; oil filter",
+        estHours:1,
+        supplier:"Honda or parts supplier",
+        notes:"Tick list: replace engine oil and oil filter; check for leaks; reset maintenance minder if fitted. Regular interval is every 600 mi / 1,000 km, 100 h or 12 months. " + HONDA_MANUAL_NOTE
+      },
+      {
+        target:"honda-fourtrax",
+        key:"honda-air-cleaner",
+        task:"FourTrax air cleaner and drain tube",
+        priority:"Normal",
+        everyKm:1000,
+        everyHours:100,
+        everyMonths:6,
+        parts:"Air cleaner element/foam and cleaner as fitted",
+        estHours:0.5,
+        supplier:"Honda or parts supplier",
+        notes:"Tick list: clean/inspect air cleaner and housing drain tube; service more frequently in dust, sand, snow, wet or muddy conditions. " + HONDA_MANUAL_NOTE
+      },
+      {
+        target:"honda-fourtrax",
+        key:"honda-chassis-brakes",
+        task:"FourTrax brakes, boots and chassis inspection",
+        priority:"High",
+        everyKm:1000,
+        everyHours:100,
+        everyMonths:6,
+        parts:"Brake pads/shoes or boots if worn",
+        estHours:1,
+        supplier:"Honda dealer or workshop",
+        notes:"Tick list: inspect drivetrain boots, brake pads/shoes, brake switch, brake system, guards, clutch system, suspension, nuts/bolts/fasteners, wheels/tyres, tie-rod boots and steering. " + HONDA_MANUAL_NOTE
+      },
+      {
+        target:"honda-fourtrax",
+        key:"honda-final-gear-oil",
+        task:"FourTrax final gear/differential oil",
+        priority:"Normal",
+        everyKm:2000,
+        everyHours:200,
+        everyMonths:24,
+        parts:"Final gear/differential oil per model",
+        estHours:0.8,
+        supplier:"Honda or parts supplier",
+        notes:"Tick list: inspect/replace front/rear final gear or differential oil as fitted; replace every 2 years where the model schedule calls for it; service sooner after deep water or mud. " + HONDA_MANUAL_NOTE
+      },
+      {
+        target:"honda-fourtrax",
+        key:"honda-brake-fluid",
+        task:"FourTrax brake fluid replace",
+        priority:"High",
+        everyMonths:24,
+        parts:"DOT 4 brake fluid unless model book says otherwise",
+        estHours:1,
+        supplier:"Honda dealer or workshop",
+        notes:"Tick list: replace brake fluid every 2 years; inspect hoses and brake function. Replacement requires mechanical skill. " + HONDA_MANUAL_NOTE
+      },
+      {
+        target:"honda-fourtrax",
+        key:"honda-spark-valve-arrester",
+        task:"FourTrax spark plug, valve and spark arrester",
+        priority:"Normal",
+        everyKm:2000,
+        everyHours:200,
+        everyMonths:12,
+        parts:"Spark plug; workshop consumables",
+        estHours:1.5,
+        supplier:"Honda dealer or workshop",
+        notes:"Tick list: inspect/replace spark plug as fitted; check valve clearance if the model requires it; clean spark arrester; confirm dealer-only items for the exact model. " + HONDA_MANUAL_NOTE
+      },
+      {
+        target:"john-deere-6175",
+        key:"jd-engine-oil-filter",
+        task:"6175M engine oil and filter",
+        priority:"High",
+        everyHours:500,
+        everyMonths:12,
+        parts:"Plus-50 II oil 23.5 L; RE539279 oil filter",
+        estHours:1.5,
+        supplier:"John Deere",
+        notes:"Tick list: change engine oil and oil filter; use dipstick/fill procedure and record hours. The guide allows 750 h/annual only with Plus-50 II, JD OEM filter and diesel below 15 ppm sulphur; use 500 h if conditions are not met. " + JD_MANUAL_NOTE
+      },
+      {
+        target:"john-deere-6175",
+        key:"jd-fuel-filters",
+        task:"6175M primary/secondary fuel filters",
+        priority:"High",
+        everyHours:750,
+        parts:"DZ115391 primary fuel filter; DZ115392 secondary/final fuel filter",
+        estHours:1,
+        supplier:"John Deere",
+        notes:"Tick list: replace primary and secondary/final fuel filters every 750 h; prime/bleed correctly; check for leaks and water contamination. " + JD_MANUAL_NOTE
+      },
+      {
+        target:"john-deere-6175",
+        key:"jd-trans-hyd-filters",
+        task:"6175M transmission/hydraulic filters",
+        priority:"High",
+        everyHours:750,
+        parts:"AL221066 transmission filter; AL169573 hydraulic filter",
+        estHours:1.5,
+        supplier:"John Deere",
+        notes:"Tick list: replace transmission and hydraulic filters together; first service after 100 h, then first 750 h and every 750 h thereafter; record oil type and hours. " + JD_MANUAL_NOTE
+      },
+      {
+        target:"john-deere-6175",
+        key:"jd-primary-air-cab",
+        task:"6175M primary air and cab filters",
+        priority:"Normal",
+        everyHours:1500,
+        everyMonths:24,
+        parts:"AL215053 primary air; AL225552 cab air; L214634 recirculation filters",
+        estHours:1,
+        supplier:"John Deere",
+        notes:"Tick list: replace primary engine air filter, cab fresh air filters and recirculation filters every 1,500 h or 2 years, or sooner/as displayed. Replace rather than clean if damaged or loaded. " + JD_MANUAL_NOTE
+      },
+      {
+        target:"john-deere-6175",
+        key:"jd-secondary-air",
+        task:"6175M secondary air filter",
+        priority:"Normal",
+        everyHours:4500,
+        everyMonths:36,
+        parts:"AL215054 secondary air filter",
+        estHours:0.5,
+        supplier:"John Deere",
+        notes:"Tick list: replace secondary air filter every fourth primary air filter change, or by the hour/year trigger in the guide. Do not leave the intake open in dusty conditions. " + JD_MANUAL_NOTE
+      },
+      {
+        target:"john-deere-6175",
+        key:"jd-crankcase-cab-carbon",
+        task:"6175M crankcase vent and carbon filters",
+        priority:"Normal",
+        everyHours:750,
+        everyMonths:12,
+        parts:"DZ105100 crankcase vent; AL158986 activated carbon kit if fitted",
+        estHours:0.8,
+        supplier:"John Deere",
+        notes:"Tick list: replace crankcase ventilation filter and activated carbon kit if fitted. The guide shows 750 h/1 year for activated carbon kits; crankcase interval varies by MY, so confirm tractor build and service display. " + JD_MANUAL_NOTE
+      },
+      {
+        target:"john-deere-6175",
+        key:"jd-def-exhaust-filters",
+        task:"6175M DEF/exhaust filters",
+        priority:"Normal",
+        everyHours:4500,
+        everyMonths:36,
+        parts:"DZ114640 DEF injection pump filter; DZ110513 DEF line filter if applicable",
+        estHours:1,
+        supplier:"John Deere",
+        notes:"Tick list: replace DEF injection pump/line filters as applicable and follow display warnings for exhaust/DPF service. The MY20 guide lists 4,500 h or 3 years for DEF filters. " + JD_MANUAL_NOTE
+      },
+      {
+        target:"valtra-t175",
+        key:"valtra-first-50h",
+        task:"Valtra first 50h dealer service",
+        priority:"High",
+        everyHours:50,
+        parts:"Dealer 50h service kit; engine oil/filter; fuel filters; transmission/hydraulic filters/oils as specified",
+        estHours:3,
+        supplier:"Valtra/AGCO dealer",
+        notes:"Mandatory first-service reminder for new tractors: dealer inspection after 50 running hours. Includes engine oil/filter, fuel prefilter/filter, low-pressure/lubrication filters, front axle oils, hydraulic return filter, lubrication, loader-frame bolt check if fitted, transmission calibration and road test. After completion, change or remove this row if it becomes noisy. " + VALTRA_MANUAL_NOTE
+      },
+      {
+        target:"valtra-t175",
+        key:"valtra-engine-600h",
+        task:"Valtra 600h engine oil/filter service",
+        priority:"High",
+        everyHours:600,
+        everyMonths:12,
+        parts:"AGCO engine oil filter; approved engine oil; drain seals",
+        estHours:1.5,
+        supplier:"Valtra/AGCO dealer",
+        notes:"Tick list: change engine oil and filter; check battery terminals, belts, cooling and service display. Official T Series Stage V service interval is 600 h; in extremely dusty conditions or first-generation biodiesel over 7%, change oil/filter every 250 h. " + VALTRA_MANUAL_NOTE
+      },
+      {
+        target:"valtra-t175",
+        key:"valtra-air-cooling",
+        task:"Valtra air filters and cooling clean",
+        priority:"Normal",
+        everyHours:600,
+        everyMonths:12,
+        parts:"Engine/cab air filters if dirty or due",
+        estHours:1,
+        supplier:"Valtra/AGCO dealer",
+        notes:"Tick list: inspect/replace engine air filters as required, clean cab ventilation filters more frequently in dust, clean coolers/radiator externally and check belts/hoses. " + VALTRA_MANUAL_NOTE
+      },
+      {
+        target:"valtra-t175",
+        key:"valtra-valves-calibration",
+        task:"Valtra valves and transmission calibration",
+        priority:"Normal",
+        everyHours:1200,
+        parts:"Workshop consumables",
+        estHours:2,
+        supplier:"Valtra/AGCO dealer",
+        notes:"Tick list: adjust/check engine valves and run transmission automatic calibration. The source notes first valve adjustment and transmission calibration after 600 h, then every 1,200 h. " + VALTRA_MANUAL_NOTE
+      },
+      {
+        target:"valtra-t175",
+        key:"valtra-1200h-filters-hydraulic",
+        task:"Valtra 1200h fuel/hydraulic service",
+        priority:"High",
+        everyHours:1200,
+        everyMonths:12,
+        parts:"Fuel filter; fuel prefilter; hydraulic oil/filter/breather parts per variant",
+        estHours:3,
+        supplier:"Valtra/AGCO dealer",
+        notes:"Tick list: replace fuel filter and prefilter with original AGCO parts, service hydraulic/front axle items per exact variant, and record hours. Fuel filters shorten to 500 h when first-generation biodiesel over 7% is used; normal interval is 1,200 h. " + VALTRA_MANUAL_NOTE
+      },
+      {
+        target:"valtra-t175",
+        key:"valtra-2400h-major",
+        task:"Valtra 2400h major service",
+        priority:"Normal",
+        everyHours:2400,
+        everyMonths:24,
+        parts:"Transmission/hydraulic oils and filters per exact variant; coolant/brake items per book",
+        estHours:4,
+        supplier:"Valtra/AGCO dealer",
+        notes:"Tick list: complete all lower-hour tasks plus every-other-year/2,400 h items from the exact T175 service book. Confirm transmission, front axle, hydraulic and coolant requirements by serial number. " + VALTRA_MANUAL_NOTE
+      }
+    ];
+    const FLEET_PART_TEMPLATES = [
+      {targets:["navara-dx"],key:"navara-engine-oil",name:"Navara TD25Ti engine oil",supplier:"Nissan or oil supplier",reorder:1,location:"Workshop",notes:"Keep enough for one severe oil/filter service. Manual source lists 6.7 L with oil filter for TD25Ti; confirm exact engine."},
+      {targets:["navara-dx"],key:"navara-oil-filter",name:"Navara engine oil filter",supplier:"Nissan or parts supplier",reorder:1,location:"Workshop",notes:"Order by rego/VIN for the D22/DX 2.5D."},
+      {targets:["navara-dx"],key:"navara-air-filter",name:"Navara air cleaner element",supplier:"Nissan or parts supplier",reorder:1,location:"Workshop",notes:"Dust/off-road use needs more frequent inspection and replacement."},
+      {targets:["navara-dx"],key:"navara-fuel-filter",name:"Navara diesel fuel filter",supplier:"Nissan or parts supplier",reorder:1,location:"Workshop",notes:"Keep one spare for the Navara severe-service schedule."},
+      {targets:["navara-dx"],key:"navara-brake-fluid",name:"Navara brake/clutch fluid",supplier:"Parts supplier",reorder:1,location:"Workshop",notes:"Confirm DOT 3 or DOT 4 against the vehicle service book before use."},
+      {targets:["navara-dx"],key:"navara-driveline-oil",name:"Navara 4WD driveline oils",supplier:"Oil supplier",reorder:1,location:"Workshop",notes:"Manual source lists GL-4/GL-5 fluids depending on gearbox/transfer/differential. Confirm exact oils before service."},
+      {targets:["canam-defender"],key:"canam-engine-oil",name:"Can-Am XPS/equivalent 4T engine oil",supplier:"Can-Am/BRP",reorder:1,location:"Workshop",notes:"Use XPS 4T 5W40/0W40/10W50 or equivalent API SJ/SL/SM/SN oil as temperature and guide require."},
+      {targets:["canam-defender"],key:"canam-oil-filter",name:"Can-Am Defender oil filter",supplier:"Can-Am/BRP",reorder:1,location:"Workshop",notes:"Order by Defender HD9 XU serial/VIN."},
+      {targets:["canam-defender"],key:"canam-air-cvt-filter",name:"Can-Am Defender air/CVT filters",supplier:"Can-Am/BRP",reorder:1,location:"Workshop",notes:"Dust, farm, deep mud or water use needs extra cleaning and inspection."},
+      {targets:["canam-defender"],key:"canam-gearbox-oil",name:"Can-Am 75W140 gearbox oil",supplier:"Can-Am/BRP or oil supplier",reorder:1,location:"Workshop",notes:"Use XPS 75W140 synthetic gear oil or 75W140 API GL-5 synthetic if XPS is not available."},
+      {targets:["canam-defender"],key:"canam-brake-fluid",name:"Can-Am DOT 4 brake fluid",supplier:"Can-Am/BRP or parts supplier",reorder:1,location:"Workshop",notes:"For 2-year brake fluid replacement."},
+      {targets:["canam-defender"],key:"canam-coolant",name:"Can-Am Defender coolant",supplier:"Can-Am/BRP",reorder:1,location:"Order when due",notes:"For 5-year / 12,000 km coolant replacement."},
+      {targets:["canam-defender"],key:"canam-spark-plugs",name:"Can-Am Defender HD9 spark plugs",supplier:"Can-Am/BRP",reorder:2,location:"Order when due",notes:"Manual specs show two plugs for HD9/HD10; confirm part number by serial before ordering."},
+      {targets:["honda-fourtrax"],key:"honda-gn4-oil",name:"Honda FourTrax GN4/equivalent oil",supplier:"Honda or oil supplier",reorder:1,location:"Workshop",notes:"Use Honda 4-stroke oil or equivalent motorcycle/ATV oil for wet-clutch compatibility. Confirm grade by model."},
+      {targets:["honda-fourtrax"],key:"honda-oil-filter",name:"Honda FourTrax oil filter",supplier:"Honda",reorder:1,location:"Workshop",notes:"Order by exact FourTrax model/year."},
+      {targets:["honda-fourtrax"],key:"honda-air-cleaner",name:"Honda FourTrax air cleaner",supplier:"Honda",reorder:1,location:"Workshop",notes:"Service more frequently in dust, sand, snow, wet or muddy conditions."},
+      {targets:["honda-fourtrax"],key:"honda-spark-plug",name:"Honda FourTrax spark plug",supplier:"Honda",reorder:1,location:"Order when due",notes:"Confirm exact plug by model/year."},
+      {targets:["honda-fourtrax"],key:"honda-final-gear-oil",name:"Honda FourTrax final gear oil",supplier:"Honda or oil supplier",reorder:1,location:"Workshop",notes:"For final drive/differential service where fitted; confirm grade by model."},
+      {targets:["honda-fourtrax"],key:"honda-brake-fluid",name:"Honda FourTrax brake fluid",supplier:"Honda or parts supplier",reorder:1,location:"Workshop",notes:"For 2-year brake fluid replacement; confirm DOT grade by model."},
+      {targets:["john-deere-6175"],key:"jd-plus50-oil",name:"John Deere Plus-50 II engine oil",supplier:"John Deere",reorder:1,location:"Workshop",notes:"6175M crankcase capacity about 23.5 L; extended interval requires Plus-50 II, JD filter and low-sulphur diesel."},
+      {targets:["john-deere-6175"],key:"jd-re539279",name:"John Deere RE539279 oil filter",supplier:"John Deere",reorder:1,location:"Workshop",notes:"6175M engine oil filter."},
+      {targets:["john-deere-6175"],key:"jd-fuel-filters",name:"John Deere 6175M fuel filters",supplier:"John Deere",reorder:1,location:"Workshop",notes:"DZ115391 primary fuel filter and DZ115392 secondary/final fuel filter."},
+      {targets:["john-deere-6175"],key:"jd-trans-hyd-filters",name:"John Deere transmission/hydraulic filters",supplier:"John Deere",reorder:1,location:"Workshop",notes:"AL221066 transmission filter and AL169573 hydraulic filter."},
+      {targets:["john-deere-6175"],key:"jd-air-filters",name:"John Deere 6175M air filters",supplier:"John Deere",reorder:1,location:"Order when due",notes:"AL215053 primary air filter and AL215054 secondary air filter."},
+      {targets:["john-deere-6175"],key:"jd-cab-filters",name:"John Deere 6175M cab filters",supplier:"John Deere",reorder:1,location:"Order when due",notes:"AL225552 cab fresh air, L214634 recirculation filters, AL158986 activated carbon kit if fitted."},
+      {targets:["john-deere-6175"],key:"jd-crankcase-vent",name:"John Deere DZ105100 crankcase vent filter",supplier:"John Deere",reorder:1,location:"Order when due",notes:"Confirm interval by tractor MY/service display."},
+      {targets:["john-deere-6175"],key:"jd-def-filters",name:"John Deere DEF/exhaust filters",supplier:"John Deere",reorder:1,location:"Order when due",notes:"DZ114640 DEF injection pump filter and DZ110513 DEF line filter if applicable."},
+      {targets:["john-deere-6175"],key:"jd-hygard",name:"John Deere Hy-Gard transmission/hydraulic oil",supplier:"John Deere",reorder:1,location:"Order when due",notes:"For transmission/hydraulic/front-drive service. Confirm capacity and variant before ordering."},
+      {targets:["valtra-t175"],key:"valtra-engine-oil-filter",name:"Valtra/AGCO engine oil filter",supplier:"Valtra/AGCO dealer",reorder:1,location:"Workshop",notes:"Use original AGCO filters; order by serial for the T175/T175ev."},
+      {targets:["valtra-t175"],key:"valtra-engine-oil",name:"Valtra approved engine oil",supplier:"Valtra/AGCO dealer or oil supplier",reorder:1,location:"Workshop",notes:"For 600 h engine oil service; shorten to 250 h in extreme dust or first-generation biodiesel over 7%."},
+      {targets:["valtra-t175"],key:"valtra-fuel-filters",name:"Valtra/AGCO fuel filter and prefilter",supplier:"Valtra/AGCO dealer",reorder:1,location:"Workshop",notes:"Normal interval 1,200 h; 500 h with first-generation biodiesel over 7%."},
+      {targets:["valtra-t175"],key:"valtra-air-filters",name:"Valtra engine/cab air filters",supplier:"Valtra/AGCO dealer",reorder:1,location:"Workshop",notes:"Dusty conditions require more frequent cleaning/replacement."},
+      {targets:["valtra-t175"],key:"valtra-hydraulic-filters",name:"Valtra hydraulic/transmission filters",supplier:"Valtra/AGCO dealer",reorder:1,location:"Workshop",notes:"Order by exact T175 variant and serial."},
+      {targets:["valtra-t175"],key:"valtra-hydraulic-oil",name:"Valtra hydraulic/transmission oil",supplier:"Valtra/AGCO dealer or oil supplier",reorder:1,location:"Order when due",notes:"For 1,200/2,400 h hydraulic, transmission and front axle work. Confirm exact oil by serial."},
+      {targets:["valtra-t175"],key:"valtra-service-kit",name:"Valtra 50/600/1200 h service kit",supplier:"Valtra/AGCO dealer",reorder:1,location:"Order when due",notes:"Use dealer service kit by tractor serial so all seals and filters are included."}
+    ];
     const seedState = {
       activeTab:"Dashboard",
       selectedVehicleId:"veh-brendon-qls732",
@@ -454,15 +969,81 @@
       if(onlyEroad && seedHistoryOnly) return true;
       return false;
     }
+    function vehicleText(v){
+      return [v?.id,v?.name,v?.rego,v?.type,v?.makeModel,v?.year,v?.assignedTo,v?.notes].join(" ").toLowerCase();
+    }
     function isDmaxVehicle(v){
-      const text = [v?.name,v?.makeModel,v?.type].join(" ").toLowerCase();
-      return text.includes("isuzu") && text.includes("d-max");
+      const text = vehicleText(v);
+      return text.includes("isuzu") && (text.includes("d-max") || text.includes("dmax") || text.includes("dmaz") || text.includes("damx"));
+    }
+    function isNavaraVehicle(v){
+      const text = vehicleText(v);
+      return text.includes("navara") || text.includes("bhu960");
+    }
+    function isCanamDefender(v){
+      const text = vehicleText(v).replace(/can-am/g,"canam");
+      return text.includes("defender") && (text.includes("canam") || text.includes("can am"));
+    }
+    function isHondaFourtrax(v){
+      const text = vehicleText(v);
+      return text.includes("honda") && (text.includes("fourtrax") || text.includes("foretrax") || text.includes("four wheeler") || text.includes("4 wheeler") || text.includes("trx"));
+    }
+    function isJohnDeere6175(v){
+      const text = vehicleText(v);
+      return (text.includes("john deere") || text.includes("john deer")) && (text.includes("6175m") || text.includes("6175"));
+    }
+    function isValtraT175(v){
+      const text = vehicleText(v);
+      return text.includes("valtra") && (text.includes("t175") || text.includes("t 175"));
+    }
+    function vehicleMatchesTarget(v,target){
+      if(target === "dmax-2024") return isDmaxVehicle(v) && String(v?.year||"").includes("2024");
+      if(target === "dmax-2017") return isDmaxVehicle(v) && String(v?.year||"").includes("2017");
+      if(target === "dmax-2016") return isDmaxVehicle(v) && String(v?.year||"").includes("2016");
+      if(target === "navara-dx") return isNavaraVehicle(v);
+      if(target === "canam-defender") return isCanamDefender(v);
+      if(target === "honda-fourtrax") return isHondaFourtrax(v);
+      if(target === "john-deere-6175") return isJohnDeere6175(v);
+      if(target === "valtra-t175") return isValtraT175(v);
+      return false;
+    }
+    function vehicleMatchesTargets(v,targets){
+      return (Array.isArray(targets)?targets:[targets]).some(t=>vehicleMatchesTarget(v,t));
     }
     function dmaxPlanId(vehicleId,key){
       return "plan-dmax-" + String(vehicleId).replace(/^veh-/,"") + "-" + key;
     }
     function dmaxPartId(key){
       return "part-dmax-" + key;
+    }
+    function manualPlanId(vehicleId,key){
+      return "plan-manual-" + String(vehicleId).replace(/^veh-/,"") + "-" + key;
+    }
+    function manualPartId(key){
+      return "part-manual-" + key;
+    }
+    function ensureManualScheduleVehicles(now){
+      let changed = false;
+      MANUAL_VEHICLE_TEMPLATES.forEach(t=>{
+        if(state.vehicles.some(v=>vehicleMatchesTarget(v,t.target) || v.id===t.id)) return;
+        state.vehicles.push({
+          id:t.id,
+          name:t.name,
+          rego:t.rego,
+          type:t.type,
+          makeModel:t.makeModel,
+          year:t.year,
+          assignedTo:t.assignedTo,
+          location:t.location,
+          currentKm:t.currentKm||0,
+          currentHours:t.currentHours||0,
+          status:t.status,
+          notes:t.notes,
+          updatedAt:now
+        });
+        changed = true;
+      });
+      return changed;
     }
     function ensureDmaxServiceSchedule(){
       if(!state || !Array.isArray(state.vehicles)) return false;
@@ -526,6 +1107,68 @@
       changed = true;
       return changed;
     }
+    function ensureFleetManualSchedules(){
+      if(!state || !Array.isArray(state.vehicles)) return false;
+      state.plans = Array.isArray(state.plans) ? state.plans : [];
+      state.parts = Array.isArray(state.parts) ? state.parts : [];
+      state.settings = {...structuredClone(seedState.settings),...(state.settings||{})};
+      if(state.settings.fleetManualScheduleVersion === FLEET_MANUAL_SCHEDULE_VERSION) return false;
+      const now = stampNow();
+      let changed = ensureManualScheduleVehicles(now);
+      const existingPlanIds = new Set(state.plans.map(p=>p.id));
+      FLEET_PLAN_TEMPLATES.forEach(t=>{
+        const vehicles = state.vehicles.filter(v=>vehicleMatchesTarget(v,t.target));
+        vehicles.forEach(v=>{
+          const planId = manualPlanId(v.id,t.key);
+          if(existingPlanIds.has(planId)) return;
+          state.plans.push({
+            id:planId,
+            vehicleId:v.id,
+            task:t.task,
+            priority:t.priority,
+            everyKm:t.everyKm||0,
+            everyHours:t.everyHours||0,
+            everyMonths:t.everyMonths||0,
+            lastKm:0,
+            lastHours:0,
+            lastDate:"",
+            parts:t.parts||"",
+            estHours:t.estHours||0,
+            supplier:t.supplier||"",
+            notes:(t.notes||"") + " " + FLEET_MANUAL_NOTE,
+            updatedAt:now
+          });
+          existingPlanIds.add(planId);
+          changed = true;
+        });
+      });
+      const existingPartIds = new Set(state.parts.map(p=>p.id));
+      FLEET_PART_TEMPLATES.forEach(t=>{
+        const vehicleIds = state.vehicles.filter(v=>vehicleMatchesTargets(v,t.targets)).map(v=>v.id);
+        if(!vehicleIds.length) return;
+        const partId = manualPartId(t.key);
+        if(existingPartIds.has(partId)) return;
+        state.parts.push({
+          id:partId,
+          name:t.name,
+          partNo:t.partNo||"",
+          supplier:t.supplier,
+          qty:0,
+          reorder:t.reorder,
+          unitCost:0,
+          location:t.location,
+          vehicleIds,
+          notes:(t.notes||"") + " " + FLEET_MANUAL_NOTE,
+          updatedAt:now
+        });
+        existingPartIds.add(partId);
+        changed = true;
+      });
+      state.settings.fleetManualScheduleVersion = FLEET_MANUAL_SCHEDULE_VERSION;
+      state.settings.fleetManualScheduleAppliedAt = now;
+      changed = true;
+      return changed;
+    }
     function saveLocal(){
       state.updatedAt = new Date().toISOString();
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
@@ -575,7 +1218,9 @@
         if(typeof state.settings.staff === "string") state.settings.staff = state.settings.staff.split(",").map(s=>s.trim()).filter(Boolean);
         if(!Array.isArray(state.settings.staff) || !state.settings.staff.length) state.settings.staff = DEFAULT_STAFF.slice();
       }
-      const migrated = ensureDmaxServiceSchedule();
+      const dmaxMigrated = ensureDmaxServiceSchedule();
+      const fleetManualMigrated = ensureFleetManualSchedules();
+      const migrated = dmaxMigrated || fleetManualMigrated;
       saveLocal();
       render();
       return migrated;
@@ -1457,7 +2102,9 @@
       a.remove();
       URL.revokeObjectURL(url);
     }
-    if(ensureDmaxServiceSchedule()) saveLocal();
+    const bootDmaxMigrated = ensureDmaxServiceSchedule();
+    const bootFleetManualMigrated = ensureFleetManualSchedules();
+    if(bootDmaxMigrated || bootFleetManualMigrated) saveLocal();
     render();
     if(SCRIPT_URL){ pullFromSheet(); setInterval(pollSheet, 30000); }
   </script>
